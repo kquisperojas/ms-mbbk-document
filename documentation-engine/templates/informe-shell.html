@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NEG-1678 — Estado de Cuenta | Documentación</title>
+  <style>
+    :root {
+      /* Banco Pichincha PE — paleta institucional (pichincha.pe) */
+      --bp-yellow: #ffdd00;
+      --bp-yellow-dark: #ffd000;
+      --bp-blue: #0f265c;
+      --bp-blue-dark: #0c2050;
+      --bp-blue-deep: #03102d;
+      --bp-cyan: #26a3dd;
+      --bp-cyan-dark: #1a89c9;
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --text: #222222;
+      --muted: #484848;
+      --border: #dbdbdc;
+      --nav: #0f265c;
+      --nav-text: #ffffff;
+      --accent: #0f265c;
+      --accent-soft: #cfd3de;
+      --accent-yellow: #ffdd00;
+      --warn-bg: #fde1cc;
+      --danger: #d50707;
+      --success: #31a451;
+      --success-bg: #daeedf;
+      --success-border: #61b679;
+      --warn: #f76800;
+      --warn-border: #faa466;
+      --danger-bg: #f7cdcd;
+      --danger-border: #ee9c9c;
+      --bar-green: #31a451;
+      --bar-warn: #f76800;
+      --bar-danger: #d50707;
+      --tertiary: #727272;
+      --link: #1a89c9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Candara", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: linear-gradient(120deg, var(--bp-blue-deep) 0%, var(--bp-blue) 55%, var(--bp-blue-dark) 100%);
+      color: var(--nav-text);
+      border-bottom: 3px solid var(--bp-yellow);
+      box-shadow: 0 8px 24px rgba(15, 38, 92, 0.28);
+    }
+    .topbar-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 14px 20px 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px 20px;
+    }
+    .brand {
+      display: flex;
+      flex-direction: column;
+      min-width: 180px;
+      margin-right: auto;
+    }
+    .brand strong { font-size: 1.05rem; letter-spacing: 0.02em; }
+    .brand span { font-size: 0.8rem; opacity: 0.8; }
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+    .nav button {
+      border: 0;
+      background: transparent;
+      color: var(--nav-text);
+      padding: 10px 14px;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.95rem;
+      opacity: 0.85;
+    }
+    .nav button.active {
+      background: rgba(255,255,255,0.12);
+      opacity: 1;
+      box-shadow: inset 0 -3px 0 var(--bp-yellow);
+    }
+    .nav button:hover { opacity: 1; background: rgba(255,255,255,0.08); }
+    .share-wrap {
+      position: relative;
+      margin: 4px 0 10px;
+    }
+    .share-btn {
+      background: var(--bp-yellow);
+      color: var(--bp-blue);
+      border-radius: 8px;
+      font-weight: 700;
+      opacity: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.95rem;
+    }
+    .share-btn:hover, .share-btn[aria-expanded="true"] {
+      background: var(--bp-yellow-dark);
+    }
+    .share-btn .chevron {
+      font-size: 0.7rem;
+      line-height: 1;
+      transition: transform .15s;
+    }
+    .share-btn[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+    .share-menu {
+      display: none;
+      position: absolute;
+      left: 0;
+      right: auto;
+      top: calc(100% + 6px);
+      min-width: 260px;
+      max-width: min(320px, calc(100vw - 24px));
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 12px 32px rgba(15, 38, 92, 0.18);
+      padding: 6px;
+      z-index: 60;
+    }
+    .share-menu.open { display: block; }
+    .share-menu > .share-item {
+      position: relative;
+    }
+    .share-menu button.share-section {
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      color: var(--bp-blue);
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.92rem;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .share-menu button.share-section:hover,
+    .share-menu button.share-section:focus,
+    .share-menu button.share-section[aria-expanded="true"] {
+      background: rgba(255, 221, 0, 0.28);
+      color: var(--bp-blue);
+    }
+    .share-menu button.share-section .arrow {
+      color: var(--tertiary);
+      font-size: 0.85rem;
+      transition: transform .15s;
+    }
+    .share-menu button.share-section[aria-expanded="true"] .arrow {
+      transform: rotate(90deg);
+    }
+    .share-submenu {
+      display: none;
+      position: relative;
+      left: 0;
+      top: 0;
+      min-width: 0;
+      background: #f8f9fc;
+      border: 0;
+      border-top: 1px solid var(--border);
+      border-radius: 0 0 8px 8px;
+      box-shadow: none;
+      padding: 8px;
+      margin: 0 4px 6px;
+      z-index: 61;
+    }
+    .share-submenu.open { display: block; }
+    .share-submenu .share-path {
+      font-size: 0.72rem;
+      color: var(--muted);
+      background: #f4f6f9;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+      margin: 4px 0 8px;
+      word-break: break-all;
+      line-height: 1.35;
+      font-family: Consolas, "Cascadia Mono", monospace;
+    }
+    .share-submenu .share-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--bp-blue);
+      padding: 4px 4px 6px;
+    }
+    .share-channel {
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      padding: 9px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .share-channel:hover {
+      background: rgba(255, 221, 0, 0.25);
+      color: var(--bp-blue);
+    }
+    .share-channel .ico {
+      width: 1.25rem;
+      text-align: center;
+      font-size: 0.95rem;
+    }
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: var(--bp-blue);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+      z-index: 70;
+      max-width: min(420px, calc(100vw - 40px));
+      box-shadow: 0 8px 24px rgba(15, 38, 92, 0.25);
+    }
+    .toast.show { opacity: 1; }
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 20px 72px;
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    h1 { font-size: 1.7rem; margin: 0 0 8px; }
+    h2 { font-size: 1.25rem; margin: 28px 0 10px; }
+    h3 { font-size: 1.05rem; margin: 18px 0 8px; }
+    p { margin: 0 0 12px; }
+    .muted { color: var(--muted); }
+    .tertiary { color: var(--tertiary); font-size: 0.9rem; }
+    .lede {
+      font-size: 1.05rem;
+      max-width: 70ch;
+      margin-bottom: 20px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    @media (max-width: 900px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .card h3 { margin-top: 0; }
+    .tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(255, 221, 0, 0.35);
+      color: var(--bp-blue);
+      margin-bottom: 8px;
+    }
+    .tag.mod { background: #d5e4f2; color: #104798; }
+    .tag.reuse { background: #ffead0; color: #c45a00; }
+    .tag.core { background: #cfd3de; color: #0f265c; }
+    table.contrast, table.api {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      font-size: 0.92rem;
+    }
+    table.contrast th, table.contrast td,
+    table.api th, table.api td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    table.contrast th, table.api th { background: #e9ecf3; color: var(--bp-blue); }
+    code, .mono {
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 0.86em;
+      background: #e9ecf3;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    ul.clean { padding-left: 1.15rem; margin: 0 0 12px; }
+    ul.clean li { margin-bottom: 6px; }
+    .callout {
+      border-left: 4px solid var(--bp-yellow);
+      background: #fffceb;
+      padding: 12px 14px;
+      border-radius: 0 8px 8px 0;
+      margin: 14px 0;
+    }
+    .callout.warn {
+      border-left-color: var(--warn);
+      background: var(--warn-bg);
+    }
+    .diagram-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0 14px;
+    }
+    .diagram-tabs button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 999px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.9rem;
+    }
+    .diagram-tabs button.active {
+      background: var(--bp-blue);
+      color: #fff;
+      border-color: var(--bp-blue);
+      box-shadow: inset 0 -2px 0 var(--bp-yellow);
+    }
+    .diagram-frame {
+      width: 100%;
+      min-height: 720px;
+      height: 78vh;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #111;
+    }
+    .diagram-view { display: none; }
+    .diagram-view.active { display: block; }
+    .ms-list .card p:last-child { margin-bottom: 0; }
+    .stats {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin: 16px 0;
+    }
+    .stat { min-width: 110px; }
+    .stat strong { display: block; font-size: 1.75rem; line-height: 1.1; }
+    .stat span { color: var(--muted); font-size: 0.85rem; }
+    .stat.success strong { color: var(--success); }
+    .stat.warn strong { color: var(--warn); }
+    .stat.danger strong { color: var(--danger); }
+    .usage {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 12px 0 20px;
+    }
+    .usage-labels {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .usage-track {
+      height: 10px;
+      background: #ecece8;
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+    }
+    .usage-seg { height: 100%; }
+    .usage-seg.green { background: var(--bar-green); }
+    .filters-block { margin: 14px 0; }
+    .filters-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--tertiary);
+      margin-bottom: 8px;
+    }
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .pill.active {
+      background: var(--bp-blue);
+      border-color: var(--bp-blue);
+      color: #fff;
+      box-shadow: inset 0 -2px 0 var(--bp-yellow);
+    }
+    .panel-pruebas table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 0.9rem;
+    }
+    .panel-pruebas th, .panel-pruebas td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .panel-pruebas th {
+      background: #e9ecf3;
+      color: var(--bp-blue);
+      font-weight: 600;
+      font-size: 0.8rem;
+      position: sticky;
+      top: 0;
+    }
+    .panel-pruebas tr:nth-child(even) td { background: #f8f9fc; }
+    .panel-pruebas tr.tone-success td:first-child { box-shadow: inset 3px 0 0 var(--bar-green); }
+    .panel-pruebas tr.tone-warning td:first-child { box-shadow: inset 3px 0 0 var(--bar-warn); }
+    .panel-pruebas tr.tone-danger td:first-child { box-shadow: inset 3px 0 0 var(--bar-danger); }
+    .id { font-weight: 600; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .badge.success { background: var(--success-bg); color: var(--success); }
+    .badge.warn { background: var(--warn-bg); color: var(--warn); }
+    .badge.danger { background: var(--danger-bg); color: var(--danger); }
+    .chart { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .chart-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 42px;
+      gap: 10px;
+      align-items: center;
+    }
+    .chart-label { font-size: 0.85rem; color: var(--muted); }
+    .chart-bar {
+      height: 18px;
+      background: #ecece8;
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+    }
+    .chart-fill { height: 100%; }
+    .chart-fill.success { background: var(--bar-green); }
+    .chart-fill.warn { background: var(--bar-warn); }
+    .chart-fill.danger { background: var(--bar-danger); }
+    .chart-value { font-size: 0.85rem; text-align: right; }
+    .legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .legend span::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+    .legend .l-success::before { background: var(--bar-green); }
+    .legend .l-warn::before { background: var(--bar-warn); }
+    .legend .l-danger::before { background: var(--bar-danger); }
+    .callout.success {
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 0 0 12px;
+    }
+    .callout.success strong { display: block; margin-bottom: 4px; }
+    .table-wrap { overflow-x: auto; }
+    .empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .pruebas-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .pruebas-grid { grid-template-columns: 1fr; }
+    }
+    a.link { color: var(--link); }
+    h1, h2 { color: var(--bp-blue); }
+    footer.note {
+      margin-top: 36px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <strong>NEG-1678 · Estado de Cuenta</strong>
+        <span>Documentación técnica · ch-mbbk-customer-agreement-management-v1</span>
+      </div>
+      <nav class="nav" aria-label="Secciones">
+        <button type="button" data-section="iniciativa" class="active">Iniciativa</button>
+        <button type="button" data-section="solucion">Solución</button>
+        <button type="button" data-section="diagramas">Diagramas</button>
+        <button type="button" data-section="pruebas">Pruebas</button>
+      </nav>
+      <div class="share-wrap" id="share-wrap">
+        <button type="button" class="share-btn" id="share-btn" aria-expanded="false" aria-haspopup="true" aria-controls="share-menu">
+          Compartir <span class="chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="share-menu" id="share-menu" role="menu" hidden>
+          <div class="share-item" role="none">
+            <button type="button" class="share-section" data-section="iniciativa" role="menuitem" aria-haspopup="true">Iniciativa <span class="arrow">›</span></button>
+            <div class="share-submenu" data-submenu="iniciativa" role="menu"></div>
+          </div>
+          <div class="share-item" role="none">
+            <button type="button" class="share-section" data-section="solucion" role="menuitem" aria-haspopup="true">Solución <span class="arrow">›</span></button>
+            <div class="share-submenu" data-submenu="solucion" role="menu"></div>
+          </div>
+          <div class="share-item" role="none">
+            <button type="button" class="share-section" data-section="diagramas" role="menuitem" aria-haspopup="true">Diagramas <span class="arrow">›</span></button>
+            <div class="share-submenu" data-submenu="diagramas" role="menu"></div>
+          </div>
+          <div class="share-item" role="none">
+            <button type="button" class="share-section" data-section="pruebas" role="menuitem" aria-haspopup="true">Pruebas <span class="arrow">›</span></button>
+            <div class="share-submenu" data-submenu="pruebas" role="menu"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- INICIATIVA -->
+    <section id="iniciativa" class="panel active">
+      <h1>Iniciativa</h1>
+      <p class="lede muted">Qué solicita NEG-1678 según el Documento de Definición Técnica (DET v2.0) y la arquitectura To-Be.</p>
+
+      <div class="callout">
+        <strong>Objetivo:</strong> habilitar en la app móvil el listado de cuentas de ahorro elegibles para estado de cuenta
+        y la descarga de PDFs mensuales de periodos cerrados (PEN y USD), extendiendo el microservicio de experiencia
+        <code>ch-mbbk-customer-agreement-management-v1</code>.
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>En alcance</h3>
+          <ul class="clean">
+            <li>Dos endpoints REST en el MS de experiencia existente.</li>
+            <li>Listado de cuentas habilitadas para generación de EECC (consumo móvil).</li>
+            <li>Generación y descarga de reporte de movimientos de ahorro en soles y dólares.</li>
+            <li>Solo periodos de <strong>cierre de mes</strong> (meses cerrados).</li>
+            <li>Consulta de movimientos de los <strong>últimos 12 meses</strong>.</li>
+            <li>Integración vía trama <strong>3037</strong> (saldo inicial, movimientos, saldo final) a través de personal-account.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Fuera de alcance</h3>
+          <ul class="clean">
+            <li>Descargas con antigüedad mayor a 12 meses.</li>
+            <li>Modificaciones en sistemas core o backends que generan/almacenan movimientos.</li>
+            <li>Productos distintos a cuentas de ahorro en soles y dólares.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>Endpoints solicitados (DET)</h2>
+      <table class="api">
+        <thead>
+          <tr>
+            <th>Método</th>
+            <th>Path (DET)</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GET</td>
+            <td><code>/channel/mbbk/v1.0/customer-agreement/accounts/statement-available/retrieve</code></td>
+            <td>Lista de cuentas del cliente habilitadas para estado de cuenta.</td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/channel/mbbk/v1.0/customer-agreement/accounts/statement?productCode&amp;month&amp;year/retrieve</code></td>
+            <td>Generar/descargar PDF de movimientos del periodo (path DET con query antes de <code>/retrieve</code>).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Microservicios previstos en arquitectura</h2>
+      <div class="grid-3">
+        <div class="card"><span class="tag mod">Modificado</span><h3>customer-agreement-management-v1</h3><p>Orquestador de experiencia para ambos endpoints.</p></div>
+        <div class="card"><span class="tag reuse">Reutilizado</span><h3>personal-account-v2</h3><p>Cuentas y detalle de statement (3037).</p></div>
+        <div class="card"><span class="tag reuse">Reutilizado</span><h3>user-preference / correspondence</h3><p>Configuración de productos y plantillas HTML.</p></div>
+      </div>
+
+      <h2>Artefactos DET de referencia</h2>
+      <ul class="clean">
+        <li><a class="link" href="artefactos/Documento%20de%20Definici%C3%B3n%20T%C3%A9cnica%20DET%202.docx" download="Documento de Definicion Tecnica DET 2.docx">Documento de Definición Técnica DET 2.docx</a></li>
+        <li><a class="link" href="artefactos/Logical%20Solution%20Architecture%20To-Be%201.png" download="Logical Solution Architecture To-Be.png">Logical Solution Architecture To-Be</a></li>
+        <li><a class="link" href="artefactos/Physical%20Solution%20Architecture%20To-Be.png" download="Physical Solution Architecture To-Be.png">Physical Solution Architecture To-Be</a></li>
+        <li><a class="link" href="artefactos/Dagrama%20de%20secuencia-1.drawio%201.png" download="Diagrama de secuencia 1 - listado.png">Diagrama de secuencia 1 (listado)</a></li>
+        <li><a class="link" href="artefactos/Dagrama%20de%20secuencia-2.drawio%201.png" download="Diagrama de secuencia 2 - PDF.png">Diagrama de secuencia 2 (PDF)</a></li>
+      </ul>
+    </section>
+
+    <!-- SOLUCION -->
+    <section id="solucion" class="panel">
+      <h1>Solución</h1>
+      <p class="lede muted">Lo implementado en <code>ch-mbbk-customer-agreement-management-v1</code>, contrastado con el DET.</p>
+
+      <h2>Endpoints implementados</h2>
+      <table class="api">
+        <thead>
+          <tr><th>Método</th><th>Path real</th><th>Controller / Service</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>GET</td>
+            <td><code>/channel/mbbk/v1.0/customer-agreement/accounts/statement-available/retrieve</code></td>
+            <td><code>DocumentManagementController.retrieveStatementAvailableAccounts</code> → <code>AccountStatementServiceImpl.retrieveAvailableAccounts</code></td>
+          </tr>
+          <tr>
+            <td>GET</td>
+            <td><code>/channel/mbbk/v1.0/customer-agreement/accounts/statement/retrieve?productCode&amp;month&amp;year</code></td>
+            <td><code>DocumentManagementController.retrieveAccountStatement</code> → <code>AccountStatementServiceImpl.retrieveAccountStatement</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Contraste DET vs desarrollo</h2>
+      <table class="contrast">
+        <thead>
+          <tr><th>Tema</th><th>DET / arquitectura</th><th>Desarrollo</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Path PDF</td>
+            <td>Query embebido antes de <code>/retrieve</code></td>
+            <td>Path canónico <code>.../statement/retrieve</code> + query params (OpenAPI alineado)</td>
+          </tr>
+          <tr>
+            <td>Respuesta PDF</td>
+            <td>PDF 200 OK (plano en secuencia)</td>
+            <td>JSON con documento <strong>AES-256-GCM</strong> + headers <code>X-Content-*</code>, <code>view-only</code></td>
+          </tr>
+          <tr>
+            <td>user-preference</td>
+            <td>Configuración productos / armado plantilla (roles mezclados en DET)</td>
+            <td>Solo <code>products-preference</code> para <code>viewType</code>; soft-fail si no responde</td>
+          </tr>
+          <tr>
+            <td>correspondence</td>
+            <td>Plantilla HTML</td>
+            <td><code>GET email-templates?templateName=</code> por moneda PEN/USD</td>
+          </tr>
+          <tr>
+            <td>Contrato JSON</td>
+            <td>No documentado en DET</td>
+            <td>OpenAPI + DTOs: <code>AccountStatementAvailableResponse</code>, <code>AccountStatementResponse</code></td>
+          </tr>
+          <tr>
+            <td>Fraud / User Security</td>
+            <td>Diagramas embebidos en DET (poco relevantes)</td>
+            <td><strong>No</strong> participan en el camino EECC</td>
+          </tr>
+          <tr>
+            <td>Sesión</td>
+            <td>Hazelcast en secuencia de listado</td>
+            <td><code>AuthenticationFilter</code> + Hazelcast → <code>UserSession.ibsCode</code> como personId</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Cadenas de llamada</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>1) Cuentas disponibles</h3>
+          <ol>
+            <li>Valida headers / sesión</li>
+            <li><code>personal-account</code> GET <code>accounts</code></li>
+            <li><code>user-preference</code> GET <code>products-preference</code> (opcional)</li>
+            <li>Mapper filtra elegibles y enmascara número</li>
+            <li>JSON 200 con <code>maxMonthsAvailable</code> y cuentas</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>2) PDF estado de cuenta</h3>
+          <ol>
+            <li><code>ClosedPeriodValidator</code> (mes cerrado / ventana)</li>
+            <li>GET cuenta + elegibilidad + apertura</li>
+            <li>GET <code>accounts/statement</code></li>
+            <li>GET plantilla correspondence</li>
+            <li>PDF (FreeMarker + OpenHTMLToPDF) → AES-GCM → JSON</li>
+          </ol>
+        </div>
+      </div>
+
+      <h2>Reglas de negocio clave</h2>
+      <ul class="clean">
+        <li>Periodo cerrado: mes estrictamente anterior al actual; dentro de <code>maxMonthsAvailable</code>.</li>
+        <li>Elegibilidad: group-code configurado, PEN/USD, prefijo savings, estado <strong>A</strong>, canal Preferente; excluye Pibank.</li>
+        <li>Apertura: rechaza mes de alta / cuenta &lt; 30 días con mensaje oficial de disponibilidad.</li>
+        <li>Mancomunadas (conjunta/indistinta) no bloquean si cumplen elegibilidad.</li>
+      </ul>
+
+      <h2>Clases principales</h2>
+      <p class="mono">DocumentManagementController · AccountStatementServiceImpl · AccountStatementMapper · ClosedPeriodValidator · StatementPdfGenerator · AesGcmDocumentEncryptor · PersonalAccountConnector · UserPreferenceConnector · CorrespondenceConnector</p>
+
+      <div class="callout warn">
+        <strong>Nota de contraste:</strong> el DET no describe el cifrado del PDF ni el contrato OpenAPI; ambos son parte de la solución entregada y deben considerarse en consumo móvil.
+      </div>
+    </section>
+
+    <!-- DIAGRAMAS -->
+    <section id="diagramas" class="panel">
+      <h1>Diagramas</h1>
+      <p class="lede muted">Arquitectura, flujos y secuencias generados con Archify a partir del código. Cada microservicio indica qué hace y para qué se usa en NEG-1678.</p>
+
+      <h2>Microservicios y componentes</h2>
+      <div class="grid-2 ms-list">
+        <div class="card">
+          <span class="tag mod">Canal · modificado</span>
+          <h3>ch-mbbk-customer-agreement-management-v1</h3>
+          <p><strong>Qué hace:</strong> expone los dos endpoints EECC, valida periodo/sesión/elegibilidad, orquesta integraciones, genera el PDF y cifra la respuesta.</p>
+          <p><strong>Para qué lo usamos:</strong> es el punto de experiencia que consume la app móvil; concentra la lógica de canal sin cambiar el core.</p>
+        </div>
+        <div class="card">
+          <span class="tag reuse">Business · reutilizado</span>
+          <h3>personal-account-v2</h3>
+          <p><strong>Qué hace:</strong> lista cuentas por personId/groupCode, detalle de cuenta y statement del periodo (saldos y movimientos).</p>
+          <p><strong>Para qué lo usamos:</strong> fuente de datos de productos y movimientos; detrás opera la trama 3037 / AS400 según arquitectura DET.</p>
+        </div>
+        <div class="card">
+          <span class="tag reuse">Support · reutilizado</span>
+          <h3>jsc-mbbk-user-preference</h3>
+          <p><strong>Qué hace:</strong> entrega preferencias de producto (<code>viewType</code>/alias) vía <code>products-preference</code>.</p>
+          <p><strong>Para qué lo usamos:</strong> enriquecer el listado de cuentas disponibles; si falla, el flujo continúa sin preferencias.</p>
+        </div>
+        <div class="card">
+          <span class="tag reuse">Support · reutilizado</span>
+          <h3>ch-mbbk-correspondence</h3>
+          <p><strong>Qué hace:</strong> devuelve la plantilla HTML FreeMarker del estado de cuenta según moneda.</p>
+          <p><strong>Para qué lo usamos:</strong> material visual del PDF (PEN/USD) sin hardcodear el layout en el canal.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Sesión</span>
+          <h3>Hazelcast</h3>
+          <p><strong>Qué hace:</strong> almacena <code>UserSession</code> indexada por Session-ID.</p>
+          <p><strong>Para qué lo usamos:</strong> obtener <code>ibsCode</code> (personId) y datos del cliente para armar el PDF.</p>
+        </div>
+        <div class="card">
+          <span class="tag core">Core (DET)</span>
+          <h3>AS400 · trama 3037</h3>
+          <p><strong>Qué hace:</strong> consulta saldo inicial, movimientos y saldo final del periodo.</p>
+          <p><strong>Para qué lo usamos:</strong> origen de verdad de movimientos; el canal no lo invoca directo, sino vía personal-account.</p>
+        </div>
+      </div>
+
+      <h2>Visores Archify</h2>
+      <div class="diagram-tabs" id="diagram-tabs">
+        <button type="button" data-diagram="arch" class="active">Arquitectura MS</button>
+        <button type="button" data-diagram="flujo-disp">Flujo · disponibles</button>
+        <button type="button" data-diagram="flujo-pdf">Flujo · PDF</button>
+        <button type="button" data-diagram="seq-disp">Secuencia · disponibles</button>
+        <button type="button" data-diagram="seq-pdf">Secuencia · PDF</button>
+      </div>
+
+      <div class="diagram-view active" data-diagram-panel="arch">
+        <p class="tertiary">Mapa de microservicios del camino EECC (canal, support, business, sesión).</p>
+        <iframe class="diagram-frame" title="Arquitectura" src="diagrams/eecc-arquitectura-ms.html" loading="lazy"></iframe>
+      </div>
+      <div class="diagram-view" data-diagram-panel="flujo-disp">
+        <p class="tertiary">Diagrama de flujo del endpoint de cuentas disponibles, incluyendo soft-fail de preferencias.</p>
+        <iframe class="diagram-frame" title="Flujo disponibles" src="diagrams/eecc-flujo-disponible.html" loading="lazy"></iframe>
+      </div>
+      <div class="diagram-view" data-diagram-panel="flujo-pdf">
+        <p class="tertiary">Diagrama de flujo del PDF: validación de periodo, elegibilidad, plantilla, generación y cifrado.</p>
+        <iframe class="diagram-frame" title="Flujo PDF" src="diagrams/eecc-flujo-pdf.html" loading="lazy"></iframe>
+      </div>
+      <div class="diagram-view" data-diagram-panel="seq-disp">
+        <p class="tertiary">Secuencia de mensajes entre App, customer-agreement, personal-account y user-preference.</p>
+        <iframe class="diagram-frame" title="Secuencia disponibles" src="diagrams/eecc-secuencia-disponible.html" loading="lazy"></iframe>
+      </div>
+      <div class="diagram-view" data-diagram-panel="seq-pdf">
+        <p class="tertiary">Secuencia de mensajes para descarga del PDF cifrado.</p>
+        <iframe class="diagram-frame" title="Secuencia PDF" src="diagrams/eecc-secuencia-pdf.html" loading="lazy"></iframe>
+      </div>
+
+      <p class="tertiary" style="margin-top:12px;">También puedes abrir cada diagrama en pestaña nueva desde la carpeta <code>diagrams/</code>. Los viewers Archify incluyen Export / Share Card.</p>
+    </section>
+
+    <!-- PRUEBAS -->
+    <section id="pruebas" class="panel panel-pruebas">
+      <h1>Pruebas</h1>
+      <p class="muted">
+        Cruce de CP-001 a CP-034 contra el código. Solo estado A puede consultar.
+        CP-013/026 usan el mensaje de disponibilidad a 30 días. CP-027 a CP-032 cumplen como rechazo.
+      </p>
+
+      <div class="stats">
+        <div class="stat success"><strong id="stat-cumple">34</strong><span>Cumplen</span></div>
+        <div class="stat warn"><strong id="stat-parcial">0</strong><span>Parciales</span></div>
+        <div class="stat danger"><strong id="stat-no">0</strong><span>No cumplen</span></div>
+        <div class="stat"><strong>100%</strong><span>Cobertura (34 de 34)</span></div>
+      </div>
+
+      <div class="usage">
+        <div class="usage-labels">
+          <span>34 de 34 cumplen</span>
+          <span>0 parciales · 0 no cumplen</span>
+        </div>
+        <div class="usage-track">
+          <div class="usage-seg green" style="width:100%"></div>
+        </div>
+      </div>
+
+      <div class="pruebas-grid">
+        <div class="card">
+          <h2 style="margin-top:0">Casos por grupo funcional</h2>
+          <p class="tertiary">Eje vertical: grupo del catálogo. Series: Cumple, Parcial y No cumple.</p>
+          <div class="chart" id="chart"></div>
+          <div class="legend">
+            <span class="l-success">Cumple</span>
+            <span class="l-warn">Parcial</span>
+            <span class="l-danger">No cumple</span>
+          </div>
+          <p class="tertiary" style="margin-top:12px;margin-bottom:0;">
+            Fuente: AccountStatementServiceImpl, AccountStatementMapper y ClosedPeriodValidator · revisión 15 oct 2026
+          </p>
+        </div>
+        <div class="card">
+          <h3>Reglas confirmadas</h3>
+          <div class="callout success">
+            <strong>Solo estado A consulta</strong>
+            CP-027 a CP-032: I, T, D, O, E y C no listan ni generan PDF. retrieve responde cuenta no existe.
+          </div>
+          <div class="callout success">
+            <strong>Alta a mitad de mes (CP-013 / CP-026)</strong>
+            Mensaje oficial de disponibilidad (máx. 30 días posteriores al cierre del mes).
+          </div>
+          <p class="tertiary" style="margin-bottom:0;">
+            Soles y dólares comparten veredicto. La moneda solo elige la plantilla del PDF.
+          </p>
+          <p style="margin-top:14px;margin-bottom:0;">
+            <a class="link" href="pruebas/cumplimiento-casos-estado-cuenta.html">Abrir canvas standalone de cumplimiento</a>
+          </p>
+        </div>
+      </div>
+
+      <div class="filters-block">
+        <div class="filters-label">Resultado</div>
+        <div class="filters" id="filter-result"></div>
+      </div>
+      <div class="filters-block">
+        <div class="filters-label">Moneda</div>
+        <div class="filters" id="filter-currency"></div>
+      </div>
+      <div class="filters-block">
+        <div class="filters-label">Grupo</div>
+        <div class="filters" id="filter-group"></div>
+      </div>
+
+      <div style="margin-top:18px">
+        <h2>Detalle contra el código</h2>
+        <p class="tertiary" id="table-caption">34 de 34 casos</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Caso de prueba</th>
+                <th>Moneda</th>
+                <th>Resultado</th>
+                <th>Evidencia en el servicio</th>
+              </tr>
+            </thead>
+            <tbody id="cases-body"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="empty" hidden>Ningún caso coincide con los filtros.</div>
+      </div>
+    </section>
+
+    <footer class="note">
+      Portal NEG-1678 · generado desde DET + código (rev 25b87034) · diagramas Archify en <code>C:\WORKSPACE\NEG-1678\</code> (sincronizados a <code>diagrams/</code>).
+    </footer>
+  </main>
+
+  <div class="toast" id="toast">Enlace copiado</div>
+
+  <script>
+    /* Navigation SPA */
+    const sections = ["iniciativa", "solucion", "diagramas", "pruebas"];
+    function showSection(id) {
+      sections.forEach((s) => {
+        document.getElementById(s).classList.toggle("active", s === id);
+        document.querySelector('.nav button[data-section="' + s + '"]').classList.toggle("active", s === id);
+      });
+      history.replaceState(null, "", "#" + id);
+    }
+    document.querySelectorAll(".nav button").forEach((btn) => {
+      btn.addEventListener("click", () => showSection(btn.getAttribute("data-section")));
+    });
+    const initial = (location.hash || "#iniciativa").slice(1);
+    showSection(sections.includes(initial) ? initial : "iniciativa");
+
+    /* Diagram tabs */
+    document.querySelectorAll("#diagram-tabs button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-diagram");
+        document.querySelectorAll("#diagram-tabs button").forEach((b) => b.classList.toggle("active", b === btn));
+        document.querySelectorAll(".diagram-view").forEach((v) => {
+          v.classList.toggle("active", v.getAttribute("data-diagram-panel") === id);
+        });
+      });
+    });
+
+    /* Share — menú secciones + Teams / Correo / WhatsApp */
+    const toast = document.getElementById("toast");
+    const shareBtn = document.getElementById("share-btn");
+    const shareMenu = document.getElementById("share-menu");
+    const shareWrap = document.getElementById("share-wrap");
+    const SECTION_LABELS = {
+      iniciativa: "Iniciativa",
+      solucion: "Solución",
+      diagramas: "Diagramas",
+      pruebas: "Pruebas",
+    };
+    const FILE_PATH = ["C:", "WORKSPACE", "DOCUMENTACION", "NEG-1678", "informe-NEG-1678.html"].join("\\");
+    const FILE_URL_BASE = "file:///C:/WORKSPACE/DOCUMENTACION/NEG-1678/informe-NEG-1678.html";
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 4200);
+    }
+
+    function sectionHref(section) {
+      const base = location.href.split("#")[0];
+      return base + "#" + section;
+    }
+
+    function sectionFsPath(section) {
+      return FILE_PATH + "#" + section;
+    }
+
+    /* Navegadores necesitan file:///… no C:\… */
+    function sectionFileUrl(section) {
+      return FILE_URL_BASE + "#" + section;
+    }
+
+    function shareMessage(section) {
+      const label = SECTION_LABELS[section] || section;
+      const fileUrl = sectionFileUrl(section);
+      const path = sectionFsPath(section);
+      return [
+        "NEG-1678 · Estado de Cuenta — " + label,
+        "",
+        "Abrir en el navegador (pega esta URL):",
+        fileUrl,
+        "",
+        "Ruta en disco:",
+        path,
+      ].join(String.fromCharCode(10));
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (_) {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          const ok = document.execCommand("copy");
+          document.body.removeChild(ta);
+          return ok;
+        } catch (e) {
+          return false;
+        }
+      }
+    }
+
+    function closeShareMenu() {
+      shareMenu.classList.remove("open");
+      shareMenu.hidden = true;
+      shareBtn.setAttribute("aria-expanded", "false");
+      shareMenu.querySelectorAll(".share-submenu").forEach((el) => el.classList.remove("open"));
+      shareMenu.querySelectorAll(".share-section").forEach((el) => el.setAttribute("aria-expanded", "false"));
+    }
+
+    function openShareMenu() {
+      shareMenu.hidden = false;
+      shareMenu.classList.add("open");
+      shareBtn.setAttribute("aria-expanded", "true");
+      buildSubmenus();
+    }
+
+    function buildSubmenus() {
+      Object.keys(SECTION_LABELS).forEach((section) => {
+        const sub = shareMenu.querySelector('[data-submenu="' + section + '"]');
+        if (!sub) return;
+        const fileUrl = sectionFileUrl(section);
+        const label = SECTION_LABELS[section];
+        sub.innerHTML =
+          '<div class="share-label">Compartir · ' + label + "</div>" +
+          '<div class="share-path" title="URL para pegar en el navegador">' + fileUrl + "</div>" +
+          '<button type="button" class="share-channel" data-channel="copy" data-section="' + section + '">' +
+            '<span class="ico">▣</span> Copiar URL</button>' +
+          '<button type="button" class="share-channel" data-channel="teams" data-section="' + section + '">' +
+            '<span class="ico">T</span> Microsoft Teams</button>' +
+          '<button type="button" class="share-channel" data-channel="mail" data-section="' + section + '">' +
+            '<span class="ico">@</span> Correo</button>';
+      });
+    }
+
+    async function shareVia(channel, section) {
+      const label = SECTION_LABELS[section] || section;
+      const path = sectionFsPath(section);
+      const fileUrl = sectionFileUrl(section);
+      const msg = shareMessage(section);
+      const subject = "NEG-1678 · " + label;
+
+      if (channel === "copy") {
+        const ok = await copyText(fileUrl);
+        showToast(
+          ok
+            ? "URL copiada. Pégala en la barra del navegador."
+            : "Copia manualmente: " + fileUrl
+        );
+        closeShareMenu();
+        return;
+      }
+
+      if (channel === "teams") {
+        const ok = await copyText(msg);
+        const teamsUrl =
+          "https://teams.microsoft.com/share?href=" +
+          encodeURIComponent(fileUrl) +
+          "&msgText=" +
+          encodeURIComponent("NEG-1678 · " + label + " — " + fileUrl);
+        window.open(teamsUrl, "_blank", "noopener,noreferrer");
+        showToast(
+          (ok ? "URL copiada al portapapeles. " : "") +
+            "En Teams pega la URL file:/// si el enlace no se abre solo."
+        );
+        closeShareMenu();
+        return;
+      }
+
+      if (channel === "mail") {
+        const mailto =
+          "mailto:?subject=" +
+          encodeURIComponent(subject) +
+          "&body=" +
+          encodeURIComponent(msg);
+        window.location.href = mailto;
+        showToast("Se abrió el correo con la URL del informe.");
+        closeShareMenu();
+      }
+    }
+
+    shareBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (shareMenu.classList.contains("open")) closeShareMenu();
+      else openShareMenu();
+    });
+
+    shareMenu.addEventListener("click", (e) => {
+      const sectionBtn = e.target.closest(".share-section");
+      if (sectionBtn) {
+        e.stopPropagation();
+        const section = sectionBtn.getAttribute("data-section");
+        const sub = shareMenu.querySelector('[data-submenu="' + section + '"]');
+        const isOpen = sub && sub.classList.contains("open");
+        shareMenu.querySelectorAll(".share-submenu").forEach((el) => el.classList.remove("open"));
+        shareMenu.querySelectorAll(".share-section").forEach((el) => el.setAttribute("aria-expanded", "false"));
+        if (sub && !isOpen) {
+          sub.classList.add("open");
+          sectionBtn.setAttribute("aria-expanded", "true");
+        }
+        return;
+      }
+      const channelBtn = e.target.closest(".share-channel");
+      if (channelBtn) {
+        e.stopPropagation();
+        shareVia(channelBtn.getAttribute("data-channel"), channelBtn.getAttribute("data-section"));
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!shareWrap.contains(e.target)) closeShareMenu();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeShareMenu();
+    });
+
+    /* Pruebas — cases from canvas */
+    const CASES = [
+      { id: "CP-001", title: "Consultar períodos disponibles de una cuenta con antigüedad mayor a 12 meses", currency: "Soles", group: "Períodos", result: "Cumple", evidence: "statement-available devuelve maxMonthsAvailable (12) y currentDate. retrieve rechaza meses fuera de esa ventana." },
+      { id: "CP-002", title: "Consultar períodos disponibles de una cuenta con antigüedad menor a 12 meses", currency: "Soles", group: "Períodos", result: "Cumple", evidence: "La cuenta incluye openingDate. El canal arma la lista corta y retrieve no acepta meses anteriores a la apertura." },
+      { id: "CP-003", title: "Evitar mostrar períodos anteriores a la apertura de la cuenta", currency: "Soles", group: "Períodos", result: "Cumple", evidence: "Si el mes pedido es anterior a openingDate, responde «El periodo consultado es anterior a la apertura de la cuenta»." },
+      { id: "CP-004", title: "Consultar el primer Estado de Cuenta generado para una cuenta nueva", currency: "Soles", group: "Consulta", result: "Cumple", evidence: "El primer PDF sale en un mes cerrado posterior a la apertura, y solo si la cuenta tiene más de 30 días." },
+      { id: "CP-005", title: "Consultar Estados de Cuenta de diferentes períodos consecutivamente", currency: "Soles", group: "Consulta", result: "Cumple", evidence: "Cada consulta es independiente por month y year. No hay estado que bloquee el período siguiente." },
+      { id: "CP-006", title: "Visualizar Estado de Cuenta con movimientos de ingresos y gastos", currency: "Soles", group: "Movimientos", result: "Cumple", evidence: "movementType 5 es ingreso. Cualquier otro tipo es gasto. El PDF suma ambos totales." },
+      { id: "CP-007", title: "Visualizar Estado de Cuenta con múltiples movimientos en una misma fecha", currency: "Soles", group: "Movimientos", result: "Cumple", evidence: "No agrupa por fecha. Varios movimientos del mismo día quedan como filas distintas." },
+      { id: "CP-008", title: "Consultar Estado de Cuenta de un período sin movimientos", currency: "Soles", group: "Consulta", result: "Cumple", evidence: "Genera el PDF con la lista vacía. El saldo final repite el saldo anterior y los totales quedan en 0.00." },
+      { id: "CP-009", title: "Consultar un período con montos y saldos decimales", currency: "Soles", group: "Consulta", result: "Cumple", evidence: "Acepta importes con punto decimal y en centavos, y los formatea a dos decimales." },
+      { id: "CP-010", title: "Consultar un Estado de Cuenta con gran cantidad de movimientos", currency: "Soles", group: "Consulta", result: "Cumple", evidence: "El mapper no recorta ni pagina. Entran todos los movimientos del mes que devuelve personal-account." },
+      { id: "CP-011", title: "Validar información del cliente y cuenta en el Estado de Cuenta", currency: "Soles", group: "Datos del cliente", result: "Cumple", evidence: "El PDF lleva nombre de sesión, código IBS, número, alias, moneda y rango del período." },
+      { id: "CP-012", title: "Descargar Estado de Cuenta", currency: "Soles", group: "Descarga", result: "Cumple", evidence: "Entrega el PDF en base64 cifrado con AES-256-GCM, con plantilla de soles." },
+      { id: "CP-013", title: "Validar mensaje de error: estado de cuenta no está disponible, cuando la cuenta es creada a mitad de mes", currency: "Soles", group: "Error", result: "Cumple", evidence: "Rechaza el mes de apertura (alta a mitad de mes) con «Tu estado de cuenta aún no está disponible. Estará disponible una vez generado y, como máximo, dentro de los 30 días posteriores al cierre del mes correspondiente.»" },
+      { id: "CP-014", title: "Consultar períodos disponibles de una cuenta con antigüedad mayor a 12 meses", currency: "Dólares", group: "Períodos", result: "Cumple", evidence: "Misma ventana de 12 meses que en soles. La moneda no cambia la regla de períodos." },
+      { id: "CP-015", title: "Consultar períodos disponibles de una cuenta con antigüedad menor a 12 meses", currency: "Dólares", group: "Períodos", result: "Cumple", evidence: "openingDate recorta la lista igual que en soles. USD solo cambia la plantilla del PDF." },
+      { id: "CP-016", title: "Evitar mostrar períodos anteriores a la apertura de la cuenta", currency: "Dólares", group: "Períodos", result: "Cumple", evidence: "El rechazo por período anterior a la apertura no depende de la moneda." },
+      { id: "CP-017", title: "Consultar el primer Estado de Cuenta generado para una cuenta nueva", currency: "Dólares", group: "Consulta", result: "Cumple", evidence: "Misma regla de más de 30 días y mes posterior a la apertura. La plantilla sale por template USD." },
+      { id: "CP-018", title: "Consultar Estados de Cuenta de diferentes períodos consecutivamente", currency: "Dólares", group: "Consulta", result: "Cumple", evidence: "Cada request lleva su month y year. Se pueden pedir períodos distintos seguidos." },
+      { id: "CP-019", title: "Visualizar Estado de Cuenta con movimientos de ingresos y gastos", currency: "Dólares", group: "Movimientos", result: "Cumple", evidence: "La separación ingreso/gasto es la misma. La etiqueta de moneda del PDF es Dólares." },
+      { id: "CP-020", title: "Visualizar Estado de Cuenta con múltiples movimientos en una misma fecha", currency: "Dólares", group: "Movimientos", result: "Cumple", evidence: "El armado de filas no colapsa por fecha y no distingue PEN de USD." },
+      { id: "CP-021", title: "Consultar Estado de Cuenta de un período sin movimientos", currency: "Dólares", group: "Consulta", result: "Cumple", evidence: "Período vacío genera PDF. Saldo final = saldo anterior, en la plantilla de dólares." },
+      { id: "CP-022", title: "Consultar un período con montos y saldos decimales", currency: "Dólares", group: "Consulta", result: "Cumple", evidence: "El parseo decimal y el formato #,##0.00 aplican igual a cuentas USD." },
+      { id: "CP-023", title: "Consultar un Estado de Cuenta con gran cantidad de movimientos", currency: "Dólares", group: "Consulta", result: "Cumple", evidence: "Sin tope de movimientos. El volumen lo limita personal-account, no este servicio." },
+      { id: "CP-024", title: "Validar información del cliente y cuenta en el Estado de Cuenta", currency: "Dólares", group: "Datos del cliente", result: "Cumple", evidence: "Nombre, IBS, número y alias se mapean igual. La moneda del documento queda como Dólares." },
+      { id: "CP-025", title: "Descargar Estado de Cuenta", currency: "Dólares", group: "Descarga", result: "Cumple", evidence: "Mismo PDF cifrado AES-256-GCM, con la plantilla configurada para USD." },
+      { id: "CP-026", title: "Validar mensaje de error: estado de cuenta no está disponible, cuando la cuenta es creada a mitad de mes", currency: "Dólares", group: "Error", result: "Cumple", evidence: "Misma regla en USD: mes de apertura rechazado con el mensaje de «aún no está disponible» (máx. 30 días tras el cierre del mes)." },
+      { id: "CP-027", title: "Consultar Estados de Cuenta de una cuenta con estado I = Cuenta Inactiva", currency: "Soles/Dólares", group: "Estado de la cuenta", result: "Cumple", evidence: "Regla de negocio: solo A consulta. Inactiva no lista y retrieve responde «Cuenta no existe» (MBBK0008)." },
+      { id: "CP-028", title: "Consultar Estados de Cuenta de una cuenta con estado T = Acepta solo depósitos", currency: "Soles/Dólares", group: "Estado de la cuenta", result: "Cumple", evidence: "Estado T fuera de isStatementEligible. No hay consulta ni PDF; solo estado A es elegible." },
+      { id: "CP-029", title: "Consultar Estados de Cuenta de una cuenta con estado D = Cuenta durmiente", currency: "Soles/Dólares", group: "Estado de la cuenta", result: "Cumple", evidence: "Estado D se rechaza igual que I/T/O/E/C. No entra al listado ni al PDF." },
+      { id: "CP-030", title: "Consultar Estados de Cuenta de una cuenta con estado O = Cuenta controlada", currency: "Soles/Dólares", group: "Estado de la cuenta", result: "Cumple", evidence: "Estado O no es A. La cuenta se excluye en soles y en dólares." },
+      { id: "CP-031", title: "Consultar Estados de Cuenta de una cuenta con estado E = Embargada", currency: "Soles/Dólares", group: "Estado de la cuenta", result: "Cumple", evidence: "Embargada no consulta. OpenAPI y mapper alineados: solo estado A puede ver el PDF." },
+      { id: "CP-032", title: "Consultar Estados de Cuenta de una cuenta con estado C = Cuenta cancelada", currency: "Soles/Dólares", group: "Estado de la cuenta", result: "Cumple", evidence: "Cancelada no es elegible. retrieve responde cuenta no encontrada (MBBK0008)." },
+      { id: "CP-033", title: "Consultar Estados de Cuenta de una cuenta mancomunada conjunta", currency: "Soles/Dólares", group: "Mancomunada", result: "Cumple", evidence: "El indicador conjunta no bloquea. Si el estado es A y es preferente, consulta igual que una individual." },
+      { id: "CP-034", title: "Consultar Estados de Cuenta de una cuenta mancomunada indistinta", currency: "Soles/Dólares", group: "Mancomunada", result: "Cumple", evidence: "Indistinta también es elegible. No hay filtro por tipo de mancomunación." },
+    ];
+
+const RESULTS = ["Todos", "Cumple", "Parcial", "No cumple"];
+    const CURRENCIES = ["Todas", "Soles", "Dólares", "Soles/Dólares"];
+    const GROUPS = [
+      "Todos",
+      "Períodos",
+      "Consulta",
+      "Movimientos",
+      "Datos del cliente",
+      "Descarga",
+      "Error",
+      "Estado de la cuenta",
+      "Mancomunada",
+    ];
+    const GROUP_ORDER = GROUPS.slice(1);
+
+    const state = { result: "Todos", currency: "Todas", group: "Todos" };
+
+    function badgeClass(result) {
+      if (result === "Cumple") return "success";
+      if (result === "Parcial") return "warn";
+      return "danger";
+    }
+
+    function toneClass(result) {
+      if (result === "Cumple") return "tone-success";
+      if (result === "Parcial") return "tone-warning";
+      return "tone-danger";
+    }
+
+    function renderPills(rootId, items, key) {
+      const root = document.getElementById(rootId);
+      root.innerHTML = items
+        .map(
+          (item) =>
+            `<button type="button" class="pill${state[key] === item ? " active" : ""}" data-value="${item}">${item}</button>`
+        )
+        .join("");
+      root.querySelectorAll(".pill").forEach((button) => {
+        button.addEventListener("click", () => {
+          state[key] = button.getAttribute("data-value");
+          render();
+        });
+      });
+    }
+
+    function filteredCases() {
+      return CASES.filter(
+        (row) =>
+          (state.result === "Todos" || row.result === state.result) &&
+          (state.currency === "Todas" || row.currency === state.currency) &&
+          (state.group === "Todos" || row.group === state.group)
+      );
+    }
+
+    function renderChart() {
+      const max = Math.max(
+        ...GROUP_ORDER.map(
+          (g) => CASES.filter((row) => row.group === g).length
+        ),
+        1
+      );
+      document.getElementById("chart").innerHTML = GROUP_ORDER.map((g) => {
+        const cumple = CASES.filter((r) => r.group === g && r.result === "Cumple").length;
+        const parcial = CASES.filter((r) => r.group === g && r.result === "Parcial").length;
+        const no = CASES.filter((r) => r.group === g && r.result === "No cumple").length;
+        const total = cumple + parcial + no;
+        const pct = (n) => ((n / max) * 100).toFixed(1);
+        return `
+          <div class="chart-row">
+            <div class="chart-label">${g}</div>
+            <div class="chart-bar">
+              <div class="chart-fill success" style="width:${pct(cumple)}%"></div>
+              <div class="chart-fill warn" style="width:${pct(parcial)}%"></div>
+              <div class="chart-fill danger" style="width:${pct(no)}%"></div>
+            </div>
+            <div class="chart-value">${total}</div>
+          </div>`;
+      }).join("");
+    }
+
+    function renderTable() {
+      const filtered = filteredCases();
+      document.getElementById("table-caption").textContent =
+        `${filtered.length} de ${CASES.length} casos · el punto de la primera columna marca Cumple, Parcial o No cumple`;
+      const body = document.getElementById("cases-body");
+      const empty = document.getElementById("empty");
+      const table = body.closest("table");
+      if (filtered.length === 0) {
+        body.innerHTML = "";
+        table.hidden = true;
+        empty.hidden = false;
+        return;
+      }
+      table.hidden = false;
+      empty.hidden = true;
+      body.innerHTML = filtered
+        .map(
+          (row) => `
+        <tr class="${toneClass(row.result)}">
+          <td class="id">${row.id}</td>
+          <td>${row.title}</td>
+          <td>${row.currency}</td>
+          <td><span class="badge ${badgeClass(row.result)}">${row.result}</span></td>
+          <td>${row.evidence}</td>
+        </tr>`
+        )
+        .join("");
+    }
+
+    function render() {
+      renderPills("filter-result", RESULTS, "result");
+      renderPills("filter-currency", CURRENCIES, "currency");
+      renderPills("filter-group", GROUPS, "group");
+      renderChart();
+      renderTable();
+    }
+
+    render();
+  
+  </script>
+</body>
+</html>
