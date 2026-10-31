@@ -12,20 +12,76 @@ const EXTRA_CSS = `
     .tag.pending { background: var(--warn-bg); color: var(--warn); }
     .pruebas-head { margin: 0 0 12px; container-type: inline-size; }
     .pruebas-head h1 { margin: 0 0 6px; }
-    .pruebas-lede { margin: 0; line-height: 1.35; white-space: nowrap; max-width: 100%; font-size: min(0.95rem, 1.28cqw); }
-    .tests-upload-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 12px 0 18px; }
-    .tests-upload-grid { display: flex; justify-content: space-between; align-items: center; gap: 16px 24px; flex-wrap: wrap; }
-    .pruebas-actions-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .tests-upload-card .btn { display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 700; cursor: pointer; min-height: 38px; }
-    .tests-upload-card .btn.secondary { background: #fff; color: var(--bp-blue); border: 1px solid var(--bp-blue); }
-    .tests-upload-card .btn.primary { background: var(--bp-yellow); color: var(--bp-blue); border: 1px solid transparent; }
-    .tests-upload-card .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-    .tests-upload-card .tertiary { margin: 8px 0 0; }
-    .field-branch { display: flex; flex-direction: row; align-items: center; gap: 10px; min-width: min(280px, 100%); flex: 1; max-width: 520px; }
-    .field-branch span { font-weight: 700; color: var(--bp-blue); font-size: 0.92rem; white-space: nowrap; }
-    .field-branch input { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font: inherit; min-height: 38px; height: 38px; background: #fff; flex: 1; min-width: 0; }
+    .pruebas-lede { margin: 0; line-height: 1.35; max-width: 100%; }
+    html { scroll-padding-top: 120px; }
+    .section-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: 0 0 16px; flex-wrap: nowrap; }
+    .section-toolbar > div { flex: 1 1 auto; min-width: 0; }
+    .section-toolbar h1 { margin: 0 0 6px; }
+    .section-toolbar .lede { margin: 0; max-width: 52rem; }
+    .reprocess-open { flex: 0 0 auto; min-width: 148px; margin-top: 2px; }
     .panel-pruebas td:nth-child(2) { min-width: 280px; }
     .panel-pruebas td:last-child { max-width: 420px; }
+    .btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 11px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn.primary { background: var(--bp-yellow); color: var(--bp-blue); }
+    .btn.primary:hover { background: var(--bp-yellow-dark); }
+    .btn.secondary { background: var(--bp-blue); color: #fff; box-shadow: inset 0 -2px 0 var(--bp-yellow); }
+    .btn.secondary:hover { background: var(--bp-blue-dark); }
+    .btn[disabled] { opacity: 0.6; cursor: progress; }
+    .reprocess-field { margin: 0 0 14px; text-align: left; }
+    .reprocess-field > label:not(.btn), .reprocess-field .label { display: block; font-size: 0.82rem; font-weight: 700; color: var(--bp-blue); margin-bottom: 6px; }
+    .reprocess-field input[type="url"], .reprocess-field input[type="text"] { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; font: inherit; }
+    .reprocess-check { display: flex; align-items: flex-start; gap: 10px; text-align: left; font-weight: 600; color: var(--bp-blue); margin: 4px 0 8px; }
+    .reprocess-check input { margin-top: 3px; }
+    .reprocess-file { display: inline-flex; }
+    .reprocess-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .reprocess-actions .btn { width: auto; min-width: 132px; flex: 0 0 auto; }
+    .tests-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 28, 68, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 400;
+    }
+    .tests-overlay.show { display: flex; }
+    .tests-overlay[hidden] { display: none !important; }
+    .tests-modal {
+      width: min(560px, 100%);
+      max-height: min(90vh, 760px);
+      overflow: auto;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 26px 24px;
+      text-align: left;
+      box-shadow: 0 16px 40px rgba(3, 16, 45, 0.28);
+    }
+    .tests-modal h2 { margin: 0 0 8px; color: var(--bp-blue); }
+    .tests-modal p { margin: 0 0 8px; }
+    .tests-modal .busy { text-align: center; padding: 12px 0 4px; }
+    .tests-spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid #e9ecf3;
+      border-top-color: var(--bp-blue);
+      border-radius: 50%;
+      animation: tests-spin 0.9s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes tests-spin { to { transform: rotate(360deg); } }
 `;
 
 const tagClass = { Nuevo: "new", Modificado: "mod", Reutilizado: "reuse", Core: "core" };
@@ -42,10 +98,21 @@ function pendingList(text) {
   return `<li class="tertiary">${esc(text)}</li>`;
 }
 
+function sectionToolbar(title, lede, section) {
+  return `
+      <div class="section-toolbar">
+        <div>
+          <h1>${title}</h1>
+          ${lede}
+        </div>
+        <button type="button" class="btn primary reprocess-open" data-section="${section}">Reprocesar</button>
+      </div>`;
+}
+
 function sectionIniciativa(m) {
   const a = m.analysis;
-  const jira = m.jira;
-  const objective = a.objective || (jira && jira.description.split(/\n\n/)[0]) || a.inScope[0] || "";
+  const jira = m.jira && String(m.jira.summary || "").trim() ? m.jira : null;
+  const objective = a.objective || (jira && String(jira.description || "").split(/\n\n/)[0]) || a.inScope[0] || "";
   const endpointsRows = a.endpoints
     .map((e) => `<tr><td>${esc(e.method)}</td><td><code>${esc(e.path)}</code></td><td>${esc(e.description || "—")}</td></tr>`)
     .join("");
@@ -55,7 +122,7 @@ function sectionIniciativa(m) {
         `<div class="card"><span class="tag ${tagClass[ms.tag] || ""}">${esc(ms.tag)}</span><h3>${esc(ms.name)}</h3><p>${esc(ms.context || "Mencionado en el DET.")}</p></div>`
     )
     .join("");
-  const children = jira && jira.children.length
+  const children = jira && Array.isArray(jira.children) && jira.children.length
     ? `<h2>Historias de la épica</h2>
       <table class="api">
         <thead><tr><th>Clave</th><th>Resumen</th><th>Responsable</th><th>Estado</th></tr></thead>
@@ -81,8 +148,11 @@ function sectionIniciativa(m) {
 
   return `
     <section id="iniciativa" class="panel active">
-      <h1>Iniciativa</h1>
-      <p class="lede muted">Qué solicita ${esc(m.key)} según ${m.detName ? "el Documento de Definición Técnica" : "la épica de Jira"} y los artefactos entregados.</p>
+      ${sectionToolbar(
+        "Iniciativa",
+        `<p class="lede muted">Qué solicita ${esc(m.key)} según ${m.detName ? "el Documento de Definición Técnica" : "la épica de Jira"} y los artefactos entregados.</p>`,
+        "iniciativa"
+      )}
 
       ${objective
         ? `<div class="callout"><strong>Objetivo:</strong> ${esc(objective)}</div>`
@@ -209,52 +279,32 @@ function sectionDiagramas(m) {
 
   return `
     <section id="diagramas" class="panel">
-      <h1>Diagramas</h1>
-      <p class="lede muted">Arquitectura y secuencias de ${esc(m.key)} en visores Archify. Cada microservicio indica qué hace y para qué se usa.</p>
+      ${sectionToolbar(
+        "Diagramas",
+        `<p class="lede muted">Arquitectura y secuencias de ${esc(m.key)}. Cada microservicio indica qué hace y para qué se usa.</p>`,
+        "diagramas"
+      )}
 
       ${cards ? `<h2>Microservicios y componentes</h2><div class="grid-2 ms-list">${cards}</div>` : ""}
 
-      <h2>Visores Archify</h2>
+      <h2>Visores</h2>
       ${tabs ? `<div class="diagram-tabs" id="diagram-tabs">${tabs}</div>${views}` : '<div class="diagram-tabs" id="diagram-tabs"></div>'}
       ${pending}
 
-      <p class="tertiary" style="margin-top:12px;">También puedes abrir cada diagrama en pestaña nueva desde la carpeta <code>diagrams/</code>. Los diagramas entregados como imagen usan el visor Archify (zoom, tema, exportar); adjunta el <code>candidate.json</code> para obtener el diagrama Archify interactivo.</p>
+      <p class="tertiary" style="margin-top:12px;">Sin el check de Archify se publican las imágenes adjuntas. Si lo marcas, el portal reconstruye un diagrama Archify interactivo a partir de la imagen.</p>
     </section>`;
 }
 
 function pruebasLede() {
-  return `<p class="pruebas-lede muted">Si en la primera generación no adjuntaste el Excel, súbelo aquí e indica el link de la rama feature de la solución para contrastar los casos de prueba con el código.</p>`;
-}
-
-function testsUploadBlock(m) {
-  return `
-      <div class="tests-upload-card" data-doc-key="${esc(m.key)}">
-        <div class="tests-upload-grid">
-          <div class="pruebas-actions-row">
-            <label class="btn secondary">Elegir Excel o CSV
-              <input id="tests-file" type="file" accept=".csv,.txt,.xlsx" hidden />
-            </label>
-            <button type="button" class="btn primary" id="tests-upload-btn" disabled>Regenerar pruebas</button>
-          </div>
-          <label class="field-branch">
-            <span>Rama Feature</span>
-            <input id="tests-branch" type="url" placeholder="https://github.com/org/repo/tree/feature/..." value="${esc(m.featureBranchUrl || "")}" />
-          </label>
-        </div>
-        <p class="tertiary" id="tests-file-name">Ningún archivo seleccionado.</p>
-        <div class="callout warn" id="tests-upload-error" hidden style="margin-top:12px"></div>
-      </div>`;
+  return `<p class="lede muted pruebas-lede">Catálogo de casos de prueba. Usa <strong>Reprocesar</strong> para adjuntar el Excel y contrastarlos con la rama feature.</p>`;
 }
 
 function sectionPruebas(m) {
+  const head = sectionToolbar("Pruebas", pruebasLede(), "pruebas");
   if (!m.cases || !m.cases.length) {
     return `
     <section id="pruebas" class="panel panel-pruebas">
-      <div class="pruebas-head">
-        <h1>Pruebas</h1>
-        ${pruebasLede()}
-      </div>
-      ${testsUploadBlock(m)}
+      ${head}
       <div class="callout warn">
         <strong>Pendientes:</strong> escenarios de prueba no entregados.
         Esta sección se completa cuando se entreguen todos los escenarios.
@@ -272,11 +322,7 @@ function sectionPruebas(m) {
   const ok = count("Cumple");
   return `
     <section id="pruebas" class="panel panel-pruebas">
-      <div class="pruebas-head">
-        <h1>Pruebas</h1>
-        ${pruebasLede()}
-      </div>
-      ${testsUploadBlock(m)}
+      ${head}
       <p class="muted">Catálogo de ${total} casos de prueba entregados para ${esc(m.key)}.</p>
       ${
         m.featureBranchUrl
@@ -309,60 +355,196 @@ function sectionPruebas(m) {
     </section>`;
 }
 
-function pruebasScript(cases, key) {
-  const upload = `
+function reprocessScript(m) {
+  return `
     (function () {
-      const input = document.getElementById("tests-file");
-      const btn = document.getElementById("tests-upload-btn");
-      const nameEl = document.getElementById("tests-file-name");
-      const errEl = document.getElementById("tests-upload-error");
-      const branchEl = document.getElementById("tests-branch");
-      if (!input || !btn) return;
-      const key = ${JSON.stringify(key)};
-      const syncBtn = () => {
-        const file = input.files && input.files[0];
-        const branch = branchEl && branchEl.value.trim();
-        btn.disabled = !file || !branch;
+      const key = ${JSON.stringify(m.key)};
+      const defaults = {
+        jiraUrl: ${JSON.stringify(m.jiraUrl || "")},
+        featureBranch: ${JSON.stringify(m.featureBranchUrl || "")}
       };
-      input.addEventListener("change", () => {
-        const file = input.files && input.files[0];
-        nameEl.textContent = file ? file.name : "Ningún archivo seleccionado.";
+      const overlay = document.getElementById("reprocess-overlay");
+      const formBox = document.getElementById("reprocess-form");
+      const busyBox = document.getElementById("reprocess-busy");
+      const fields = document.getElementById("reprocess-fields");
+      const titleEl = document.getElementById("reprocess-title");
+      const ledeEl = document.getElementById("reprocess-lede");
+      const errEl = document.getElementById("reprocess-error");
+      const busyTitle = document.getElementById("reprocess-busy-title");
+      const busyText = document.getElementById("reprocess-busy-text");
+      const submitBtn = document.getElementById("reprocess-submit");
+      if (!overlay || !formBox || !fields) return;
+      const sections = {
+        iniciativa: {
+          title: "Reprocesar iniciativa",
+          lede: "Adjunta el documento técnico y el link de la épica.",
+          busy: "Se está reprocesando la iniciativa para su validación.",
+          hash: "iniciativa",
+          endpoint: "/iniciativa",
+          fields: '<div class="reprocess-field"><span class="label">Documento técnico (DET)</span><label class="btn secondary reprocess-file">Elegir DET<input id="rp-det" type="file" accept=".docx,.pdf" hidden /></label><p class="tertiary" id="rp-det-name">Ningún archivo seleccionado.</p></div><div class="reprocess-field"><label for="rp-link">Link de la épica</label><input id="rp-link" type="url" placeholder="https://pichinchaperu.atlassian.net/browse/' + key + '" value="' + (defaults.jiraUrl || "") + '" /></div>'
+        },
+        diagramas: {
+          title: "Reprocesar diagramas",
+          lede: "Adjunta secuencia y/o arquitectura. Archify es opcional.",
+          busy: "Se están reprocesando los diagramas para su validación.",
+          hash: "diagramas",
+          endpoint: "/diagramas",
+          fields: '<div class="reprocess-field"><span class="label">Diagramas de secuencia</span><label class="btn secondary reprocess-file">Elegir secuencia<input id="rp-seq" type="file" accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.json" multiple hidden /></label><p class="tertiary" id="rp-seq-name">Ningún archivo seleccionado.</p></div><div class="reprocess-field"><span class="label">Arquitectura</span><label class="btn secondary reprocess-file">Elegir arquitectura<input id="rp-arch" type="file" accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.json" multiple hidden /></label><p class="tertiary" id="rp-arch-name">Ningún archivo seleccionado.</p></div><label class="reprocess-check"><input id="rp-archify" type="checkbox" /><span>¿Quieres generar diagramas Archify?</span></label><p class="tertiary">Opcional. Si lo marcas, Archify reconstruye el diagrama a partir de la imagen (XML de draw.io embebido o el DET). Si no, se publica la imagen tal cual.</p>'
+        },
+        pruebas: {
+          title: "Reprocesar pruebas",
+          lede: "Adjunta el Excel o CSV y el link de la rama feature.",
+          busy: "Se están reprocesando las pruebas para su validación.",
+          hash: "pruebas",
+          endpoint: "/tests",
+          fields: '<div class="reprocess-field"><span class="label">Excel o CSV de casos</span><label class="btn secondary reprocess-file">Elegir Excel o CSV<input id="rp-tests" type="file" accept=".csv,.txt,.xlsx" hidden /></label><p class="tertiary" id="rp-tests-name">Ningún archivo seleccionado.</p></div><div class="reprocess-field"><label for="rp-branch">Rama Feature</label><input id="rp-branch" type="url" placeholder="https://github.com/org/repo/tree/feature/..." value="' + (defaults.featureBranch || "") + '" /></div>'
+        }
+      };
+      let current = "pruebas";
+      const fileNames = (input) => {
+        if (!input || !input.files || !input.files.length) return "Ningún archivo seleccionado.";
+        return Array.from(input.files).map((f) => f.name).join(", ");
+      };
+      const bindNames = () => {
+        [["rp-det","rp-det-name"],["rp-seq","rp-seq-name"],["rp-arch","rp-arch-name"],["rp-tests","rp-tests-name"]].forEach(([id, nameId]) => {
+          const input = document.getElementById(id);
+          const label = document.getElementById(nameId);
+          if (!input || !label) return;
+          input.addEventListener("change", () => { label.textContent = fileNames(input); errEl.hidden = true; });
+        });
+      };
+      const show = (on) => {
+        overlay.hidden = !on;
+        overlay.classList.toggle("show", on);
+        if (!on) {
+          formBox.hidden = false;
+          busyBox.hidden = true;
+          submitBtn.disabled = false;
+        }
+      };
+      const open = (section) => {
+        const cfg = sections[section];
+        if (!cfg) return;
+        current = section;
+        titleEl.textContent = cfg.title;
+        ledeEl.textContent = cfg.lede;
+        fields.innerHTML = cfg.fields;
         errEl.hidden = true;
-        syncBtn();
+        errEl.textContent = "";
+        formBox.hidden = false;
+        busyBox.hidden = true;
+        bindNames();
+        show(true);
+      };
+      document.querySelectorAll(".reprocess-open").forEach((btn) => {
+        btn.addEventListener("click", () => open(btn.getAttribute("data-section")));
       });
-      if (branchEl) branchEl.addEventListener("input", syncBtn);
-      syncBtn();
-      btn.addEventListener("click", async () => {
-        const file = input.files && input.files[0];
-        const branch = branchEl && branchEl.value.trim();
-        if (!file) return;
-        if (!branch) {
+      document.getElementById("reprocess-cancel").addEventListener("click", () => show(false));
+      overlay.addEventListener("click", (e) => { if (e.target === overlay && busyBox.hidden) show(false); });
+      formBox.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const cfg = sections[current];
+        const form = new FormData();
+        try {
+          if (current === "iniciativa") {
+            const det = document.getElementById("rp-det");
+            const link = (document.getElementById("rp-link") || {}).value || "";
+            if (!det || !det.files || !det.files[0]) throw new Error("Adjunta el documento técnico (DET).");
+            if (!link.trim()) throw new Error("Indica el link de la épica.");
+            form.append("det", det.files[0]);
+            form.append("link", link.trim());
+          } else if (current === "diagramas") {
+            const seq = document.getElementById("rp-seq");
+            const arch = document.getElementById("rp-arch");
+            const seqFiles = seq && seq.files ? Array.from(seq.files) : [];
+            const archFiles = arch && arch.files ? Array.from(arch.files) : [];
+            if (!seqFiles.length && !archFiles.length) throw new Error("Adjunta diagramas de secuencia y/o arquitectura.");
+            seqFiles.forEach((f) => form.append("sequence", f));
+            archFiles.forEach((f) => form.append("architecture", f));
+            if (document.getElementById("rp-archify") && document.getElementById("rp-archify").checked) form.append("useArchify", "true");
+          } else {
+            const tests = document.getElementById("rp-tests");
+            const branch = (document.getElementById("rp-branch") || {}).value || "";
+            if (!tests || !tests.files || !tests.files[0]) throw new Error("Adjunta el Excel o CSV de casos de prueba.");
+            if (!branch.trim()) throw new Error("Indica el link de la rama feature.");
+            form.append("tests", tests.files[0]);
+            form.append("featureBranch", branch.trim());
+          }
+        } catch (e) {
           errEl.hidden = false;
-          errEl.innerHTML = "<strong>Falta la rama feature:</strong> pega el link de GitHub de la rama de tu solución.";
+          errEl.innerHTML = "<strong>Falta un dato:</strong> " + (e.message || e);
           return;
         }
         errEl.hidden = true;
-        btn.disabled = true;
-        btn.textContent = "Validando código…";
+        formBox.hidden = true;
+        busyBox.hidden = false;
+        busyTitle.textContent = cfg.title.replace("Reprocesar", "Reprocesando");
+        busyText.textContent = cfg.busy;
+        submitBtn.disabled = true;
         try {
-          const form = new FormData();
-          form.append("tests", file);
-          form.append("featureBranch", branch);
-          const res = await fetch("/api/v1/docs/" + encodeURIComponent(key) + "/tests", { method: "POST", body: form });
+          const res = await fetch("/api/v1/docs/" + encodeURIComponent(key) + cfg.endpoint, { method: "POST", body: form });
           const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.error || data.detail || "No se pudieron regenerar las pruebas.");
-          location.hash = "pruebas";
+          if (!res.ok) throw new Error(data.error || data.detail || "No se pudo reprocesar la sección.");
+          location.hash = cfg.hash;
           location.reload();
         } catch (e) {
+          formBox.hidden = false;
+          busyBox.hidden = true;
+          submitBtn.disabled = false;
           errEl.hidden = false;
           errEl.innerHTML = "<strong>No se pudo actualizar:</strong> " + (e.message || e);
-          btn.disabled = false;
-          btn.textContent = "Regenerar pruebas";
         }
       });
     })();
   `;
-  if (!cases || !cases.length) return upload;
+}
+
+function wordDownloadScript() {
+  return `
+    (function () {
+      const btn = document.getElementById("share-word");
+      const menu = document.getElementById("share-menu");
+      if (!btn) return;
+      const requestWord = (event) => {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        if (menu) {
+          menu.classList.remove("open");
+          menu.hidden = true;
+        }
+        const shareBtn = document.getElementById("share-btn");
+        if (shareBtn) shareBtn.setAttribute("aria-expanded", "false");
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: "mbbk-download-word" }, window.parent.location.origin || "*");
+            return;
+          }
+        } catch (_) {
+          try { window.parent.postMessage({ type: "mbbk-download-word" }, "*"); return; } catch (e) {}
+        }
+        const toast = document.getElementById("toast");
+        if (toast) {
+          toast.textContent = "Abre el informe desde el portal para descargar el Word.";
+          toast.classList.add("show");
+          setTimeout(() => toast.classList.remove("show"), 2800);
+        }
+      };
+      btn.addEventListener("click", requestWord);
+      if (menu) {
+        menu.addEventListener("click", (event) => {
+          const target = event.target && event.target.closest ? event.target.closest("#share-word, .share-word") : null;
+          if (target) requestWord(event);
+        }, true);
+      }
+    })();
+  `;
+}
+
+function pruebasScript(cases, m) {
+  const reprocess = reprocessScript(m);
+  if (!cases || !cases.length) return reprocess;
   return `
     /* Pruebas */
     const CASES = ${JSON.stringify(cases).replace(/</g, "\\u003c")};
@@ -373,21 +555,25 @@ function pruebasScript(cases, key) {
     const tone = (r) => (r === "Cumple" ? "tone-success" : r === "Parcial" || r === "Pendiente" ? "tone-warning" : "tone-danger");
     function pills(rootId, items, key) {
       const root = document.getElementById(rootId);
+      if (!root) return;
       root.innerHTML = items.map((i) => '<button type="button" class="pill' + (state[key] === i ? " active" : "") + '" data-value="' + escHtml(i) + '">' + escHtml(i) + "</button>").join("");
       root.querySelectorAll(".pill").forEach((b) => b.addEventListener("click", () => { state[key] = b.getAttribute("data-value"); renderCases(); }));
     }
     function renderCases() {
       pills("filter-result", RESULTS, "result");
       const rows = CASES.filter((c) => state.result === "Todos" || c.result === state.result);
-      document.getElementById("table-caption").textContent = rows.length + " de " + CASES.length + " casos";
+      const caption = document.getElementById("table-caption");
       const body = document.getElementById("cases-body");
+      if (!body) return;
+      if (caption) caption.textContent = rows.length + " de " + CASES.length + " casos";
       const table = body.closest("table");
-      table.hidden = rows.length === 0;
-      document.getElementById("empty").hidden = rows.length !== 0;
+      if (table) table.hidden = rows.length === 0;
+      const empty = document.getElementById("empty");
+      if (empty) empty.hidden = rows.length !== 0;
       body.innerHTML = rows.map((c) => '<tr class="' + tone(c.result) + '"><td class="id">' + escHtml(c.id) + "</td><td>" + escHtml(c.title) + '</td><td><span class="badge ' + badge(c.result) + '">' + escHtml(c.result) + "</span></td><td>" + escHtml(c.evidence) + "</td></tr>").join("");
     }
     renderCases();
-    ${upload}
+    ${reprocess}
 `;
 }
 
@@ -433,6 +619,9 @@ function buildReport(m) {
           Compartir <span class="chevron" aria-hidden="true">▼</span>
         </button>
         <div class="share-menu" id="share-menu" role="menu" hidden>${shareItem("iniciativa", "Iniciativa")}${shareItem("solucion", "Solución")}${shareItem("diagramas", "Diagramas")}${shareItem("pruebas", "Pruebas")}
+          <div class="share-item" role="none">
+            <button type="button" class="share-section share-word" id="share-word" role="menuitem">Descargar Word</button>
+          </div>
         </div>
       </div>
     </div>
@@ -454,7 +643,27 @@ function buildReport(m) {
 
   <div class="toast" id="toast">Enlace copiado</div>
 
-  <script>${script}${pruebasScript(m.cases, m.key)}
+  <div class="tests-overlay" id="reprocess-overlay" hidden>
+    <div class="tests-modal" role="dialog" aria-modal="true" aria-labelledby="reprocess-title">
+      <form id="reprocess-form" novalidate>
+        <h2 id="reprocess-title">Reprocesar</h2>
+        <p class="muted" id="reprocess-lede"></p>
+        <div id="reprocess-fields"></div>
+        <div class="callout warn" id="reprocess-error" hidden style="margin-top:12px"></div>
+        <div class="reprocess-actions">
+          <button type="button" class="btn secondary" id="reprocess-cancel">Cancelar</button>
+          <button type="submit" class="btn primary" id="reprocess-submit">Reprocesar</button>
+        </div>
+      </form>
+      <div id="reprocess-busy" class="busy" hidden>
+        <div class="tests-spinner" aria-hidden="true"></div>
+        <h2 id="reprocess-busy-title">Reprocesando</h2>
+        <p id="reprocess-busy-text">Se está reprocesando la sección para su validación.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>${script}${pruebasScript(m.cases, m)}${wordDownloadScript()}
   </script>
 </body>
 </html>

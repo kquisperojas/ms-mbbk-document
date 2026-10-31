@@ -6,6 +6,7 @@ import com.pichincha.mbbk.document.credential.repository.ApiCredentialRepository
 import com.pichincha.mbbk.document.jira.dto.JiraConfigResponse;
 import com.pichincha.mbbk.document.jira.dto.JiraInitiativeResponse;
 import com.pichincha.mbbk.document.jira.dto.JiraInitiativesResponse;
+import com.pichincha.mbbk.document.jira.dto.JiraIssueResponse;
 import com.pichincha.mbbk.document.jira.dto.JiraUserResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -30,6 +31,9 @@ public class JiraService {
 
     private static final List<String> LIST_FIELDS =
             List.of("summary", "description", "assignee", "status", "issuetype", "updated", "resolutiondate");
+    private static final List<String> DETAIL_FIELDS = List.of(
+            "summary", "description", "assignee", "status", "issuetype", "updated", "resolutiondate",
+            "created", "labels", "components", "priority", "reporter", "parent", "fixVersions");
 
     private final JiraProperties properties;
     private final ApiCredentialRepository credentials;
@@ -84,6 +88,40 @@ public class JiraService {
         String jql = JiraJql.build(scope, resolveFilterId(), properties);
         List<JiraInitiativeResponse> items = searchAll(jql).stream().map(this::toInitiative).toList();
         return new JiraInitiativesResponse(jql, scope, items, documentedKeys(), Instant.now().toString());
+    }
+
+    public JiraIssueResponse getIssue(String key) {
+        if (!configured()) {
+            throw new JiraNotConfiguredException(missingMessage());
+        }
+        String issueKey = key == null ? "" : key.trim().toUpperCase();
+        if (issueKey.isBlank()) {
+            throw new JiraClientException(400, "Falta la clave de Jira.");
+        }
+        JsonNode issue = get("/rest/api/3/issue/" + issueKey + "?fields=" + String.join(",", DETAIL_FIELDS));
+        JsonNode fields = issue.path("fields");
+        JiraInitiativeResponse base = toInitiative(issue);
+        List<JiraInitiativeResponse> children = List.of();
+        try {
+            children = searchAll("parent = " + issueKey + " ORDER BY key ASC").stream()
+                    .map(this::toInitiative)
+                    .toList();
+        } catch (RuntimeException ignored) {
+            children = List.of();
+        }
+        return new JiraIssueResponse(
+                base.key(),
+                base.summary(),
+                base.description(),
+                base.assignee(),
+                fields.path("assignee").path("emailAddress").asText(""),
+                base.status(),
+                fields.path("issuetype").path("name").asText(""),
+                text(fields, "created"),
+                text(fields, "resolutiondate"),
+                fields.path("reporter").path("displayName").asText(""),
+                base.url(),
+                children);
     }
 
     boolean configured() {
@@ -185,7 +223,7 @@ public class JiraService {
         if (snippet.length() > 400) {
             snippet = snippet.substring(0, 400);
         }
-        int mapped = status == 401 || status == 403 ? status : 502;
+        int mapped = status == 401 || status == 403 || status == 404 ? status : 502;
         return new JiraClientException(mapped, "Jira respondió " + status + ": " + snippet);
     }
 

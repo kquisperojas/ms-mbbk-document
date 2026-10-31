@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { config } = require("./env");
+const { allInitiativeKeys, resolveLifecycle, readJson, modelPath, reportPath } = require("./doc-status");
 
 function countFiles(dir, filter = () => true) {
   try {
@@ -27,27 +28,44 @@ function documentedKeys() {
 }
 
 function documentationIndex() {
-  return documentedKeys()
+  return allInitiativeKeys()
     .map((key) => {
+      const life = resolveLifecycle(key);
+      if (!life) return null;
       const root = path.join(config.DOCS_ROOT, key);
-      const report = path.join(root, `informe-${key}.html`);
-      const stat = fs.statSync(report);
-      const head = fs.readFileSync(report, "utf8").slice(0, 4000);
-      const title = ((head.match(/<title>([^<]*)<\/title>/) || [])[1] || key).replace(/\s*\|\s*Documentación\s*$/, "");
-      const subtitle = ((head.match(/<span>Documentación técnica · ([^<]*)<\/span>/) || [])[1] || "").trim();
+      const model = life.hasReport ? readJson(modelPath(key)) || {} : {};
+      const report = reportPath(key);
+      let title = (model.jira && model.jira.summary) || life.title || key;
+      if (life.hasReport && fs.existsSync(report)) {
+        const head = fs.readFileSync(report, "utf8").slice(0, 4000);
+        const fromHtml = ((head.match(/<title>([^<]*)<\/title>/) || [])[1] || key).replace(/\s*\|\s*Documentación\s*$/, "");
+        title =
+          (model.jira && model.jira.summary) ||
+          fromHtml.replace(new RegExp(`^${key}\\s*—\\s*`), "") ||
+          model.title ||
+          key;
+      }
       return {
         key,
-        title: title.replace(new RegExp(`^${key}\\s*—\\s*`), ""),
-        subtitle,
-        updated: stat.mtime.toISOString(),
+        title,
+        subtitle: life.subtitle || model.subtitle || "",
+        updated: life.updated || new Date().toISOString(),
         diagrams: countFiles(path.join(root, "diagrams"), (f) => f.endsWith(".html")),
         artefactos: countFiles(path.join(root, "artefactos")),
         backups: countFiles(root, (f) => f.startsWith(`informe-${key}.backup-`)),
-        url: `/docs/${key}/informe-${key}.html`,
-        fileUrl: "file:///" + report.replace(/\\/g, "/"),
+        url: life.url,
+        fileUrl: life.hasReport ? "file:///" + report.replace(/\\/g, "/") : "",
+        status: life.status,
+        statusLabel: life.statusLabel,
+        hasReport: life.hasReport,
+        isDraft: life.isDraft,
+        missing: life.missing || [],
+        publishedAt: life.publishedAt || null,
+        publishedBy: life.publishedBy || null,
       };
     })
-    .sort((a, b) => b.updated.localeCompare(a.updated));
+    .filter(Boolean)
+    .sort((a, b) => String(b.updated || "").localeCompare(String(a.updated || "")));
 }
 
 module.exports = { documentedKeys, documentationIndex };

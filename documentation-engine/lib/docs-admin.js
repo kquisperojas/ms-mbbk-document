@@ -2,33 +2,28 @@ const fs = require("fs");
 const path = require("path");
 const { config } = require("./env");
 const { buildReport } = require("./report");
+const {
+  assertKey,
+  docRoot,
+  reportPath,
+  modelPath,
+  syncReviewRecord,
+  resolveLifecycle,
+} = require("./doc-status");
 
 const SECTION_IDS = ["iniciativa", "solucion", "diagramas", "pruebas"];
-const DOC_FOLDER_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 function stamp() {
   return new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
 }
 
-function assertKey(key) {
-  if (!DOC_FOLDER_RE.test(key || "")) {
-    const err = new Error("Clave de iniciativa inválida.");
-    err.status = 400;
-    throw err;
-  }
-  return key;
+function loadReview(key) {
+  return syncReviewRecord(key);
 }
 
-function docRoot(key) {
-  return path.join(config.DOCS_ROOT, assertKey(key));
-}
-
-function reportPath(key) {
-  return path.join(docRoot(key), `informe-${key}.html`);
-}
-
-function modelPath(key) {
-  return path.join(docRoot(key), "model.json");
+function saveReview(key, incoming) {
+  const extra = incoming && typeof incoming === "object" ? incoming : {};
+  return syncReviewRecord(key, extra);
 }
 
 function extractSection(html, id) {
@@ -71,7 +66,29 @@ function isStructured(model) {
   return Boolean(model && model.structured !== false && model.analysis && typeof model.analysis === "object");
 }
 
-function loadDocument(key) {
+async function hydrateJira(key, model) {
+  if (!model) return model;
+  const { getInitiative, isJiraPopulated } = require("./jira");
+  if (isJiraPopulated(model.jira)) return model;
+  try {
+    const jira = await getInitiative(key);
+    if (!isJiraPopulated(jira)) return model;
+    const next = {
+      ...model,
+      jira,
+      jiraUrl: jira.url || model.jiraUrl,
+      title: jira.summary || model.title,
+    };
+    writeModel(key, next);
+    const report = reportPath(key);
+    if (fs.existsSync(report)) fs.writeFileSync(report, buildReport(next), "utf8");
+    return next;
+  } catch {
+    return model;
+  }
+}
+
+async function loadDocument(key) {
   assertKey(key);
   const report = reportPath(key);
   if (!fs.existsSync(report)) {
@@ -79,8 +96,9 @@ function loadDocument(key) {
     err.status = 404;
     throw err;
   }
+  let model = readJson(modelPath(key));
+  if (model) model = await hydrateJira(key, model);
   const html = fs.readFileSync(report, "utf8");
-  const model = readJson(modelPath(key));
   const structured = isStructured(model);
   const head = html.slice(0, 4000);
   const title = ((head.match(/<title>([^<]*)<\/title>/) || [])[1] || key).replace(/\s*\|\s*Documentación\s*$/, "");
@@ -201,5 +219,8 @@ module.exports = {
   loadDocument,
   saveDocument,
   deleteDocument,
+  loadReview,
+  saveReview,
   writeModel,
+  resolveLifecycle,
 };

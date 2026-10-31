@@ -4,6 +4,7 @@ import com.pichincha.mbbk.document.config.AppConfig;
 import com.pichincha.mbbk.document.jira.dto.JiraConfigResponse;
 import com.pichincha.mbbk.document.jira.dto.JiraInitiativeResponse;
 import com.pichincha.mbbk.document.jira.dto.JiraInitiativesResponse;
+import com.pichincha.mbbk.document.jira.dto.JiraIssueResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -76,5 +77,28 @@ class JiraControllerTest {
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.detail").value(
                         "Faltan JIRA_API_TOKEN. Regístralos en Credenciales APIs (tabla credenciales_apis)."));
+    }
+
+    @Test
+    void initiativeReturnsEpicByKey() throws Exception {
+        when(jiraService.getIssue("APP-13418")).thenReturn(new JiraIssueResponse(
+                "APP-13418",
+                "[XDIG] NEG-1357 - Desbloqueo de usuarios por intentos fallidos",
+                "",
+                "Pedro Quispe Rojas",
+                "pquispe-ext@pichincha.pe",
+                "SOLUCIONADO",
+                "Epic",
+                "2025-01-13T12:09:29.044-0500",
+                "2026-02-04T16:07:36.348-0500",
+                "Niel Ugarte",
+                "https://pichinchaperu.atlassian.net/browse/APP-13418",
+                List.of()));
+
+        mockMvc.perform(get("/api/v1/initiatives/APP-13418"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.key").value("APP-13418"))
+                .andExpect(jsonPath("$.assignee").value("Pedro Quispe Rojas"))
+                .andExpect(jsonPath("$.issueType").value("Epic"));
     }
 }

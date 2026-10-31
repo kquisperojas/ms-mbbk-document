@@ -24,6 +24,135 @@ function extractMethods(text) {
   return unique([...String(text || "").matchAll(/\b(GET|POST|PUT|PATCH|DELETE)\b/gi)].map((m) => m[1].toUpperCase()));
 }
 
+const WORD_SYNONYMS = {
+  cliente: ["person", "customer", "client", "persona"],
+  estado: ["status", "state"],
+  consulta: ["get", "find", "retrieve", "query", "obtener"],
+  actualizacion: ["update", "patch", "put", "modificar"],
+  auditoria: ["audit", "log", "logger"],
+  logs: ["audit", "log", "logger"],
+  log: ["audit", "logger"],
+};
+
+function mappingPath(args) {
+  if (!args) return "";
+  const named = String(args).match(/(?:value|path)\s*=\s*(?:\{\s*)?["']([^"']+)["']/);
+  if (named) return named[1];
+  const first = String(args).match(/["']([^"']+)["']/);
+  return first ? first[1] : "";
+}
+
+function joinUrl(base, leaf) {
+  if (!leaf) return base || "";
+  if (!base) return leaf.startsWith("/") ? leaf : `/${leaf}`;
+  const left = String(base).replace(/\/$/, "");
+  const right = String(leaf).replace(/^\//, "");
+  const joined = `${left}/${right}`.replace(/\/+/g, "/");
+  return joined.startsWith("/") ? joined : `/${joined}`;
+}
+
+function extractJavaOps(text) {
+  const ops = [];
+  const classMatch = String(text || "").match(/@RequestMapping\s*(?:\(([^)]*)\))?/);
+  const prefix = classMatch ? mappingPath(classMatch[1] || "") : "";
+  const mappingRe = /@(Get|Post|Put|Patch|Delete)Mapping\s*(?:\(([^)]*)\))?/g;
+  let match;
+  while ((match = mappingRe.exec(text))) {
+    ops.push({ method: match[1].toUpperCase(), path: joinUrl(prefix, mappingPath(match[2] || "")) });
+  }
+  const requestRe = /@RequestMapping\s*\(([^)]*)\)/g;
+  while ((match = requestRe.exec(text))) {
+    const args = match[1];
+    const methodMatch = args.match(/RequestMethod\.(GET|POST|PUT|PATCH|DELETE)/i);
+    if (!methodMatch) continue;
+    ops.push({ method: methodMatch[1].toUpperCase(), path: joinUrl(prefix, mappingPath(args)) });
+  }
+  return ops;
+}
+
+function extractOpenApiOps(text) {
+  const ops = [];
+  let path = "";
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const pathMatch = line.match(/^\s{0,2}(\/[^\s:]+):\s*$/);
+    if (pathMatch) {
+      path = pathMatch[1];
+      continue;
+    }
+    const methodMatch = line.match(/^\s{2,8}(get|post|put|patch|delete):\s*$/i);
+    if (methodMatch && path) ops.push({ method: methodMatch[1].toUpperCase(), path });
+  }
+  return ops;
+}
+
+function listOperations(corpus) {
+  const ops = [];
+  for (const file of corpus.files || []) {
+    const kind = fileKind(file.path);
+    extractJavaOps(file.text).forEach((op) => ops.push({ ...op, file: file.path, kind }));
+    if (/openapi|swagger/i.test(file.path)) {
+      extractOpenApiOps(file.text).forEach((op) => ops.push({ ...op, file: file.path, kind: "contrato" }));
+    }
+  }
+  return ops;
+}
+
+function scoreOperation(op, methods, words) {
+  let score = 0;
+  if (!methods.length || methods.includes(op.method)) score += 4;
+  else return 0;
+  const hay = fold(`${op.path} ${op.file}`);
+  for (const word of words) {
+    if (hay.includes(word)) score += 3;
+    for (const syn of WORD_SYNONYMS[word] || []) {
+      if (hay.includes(syn)) score += 2;
+    }
+  }
+  if (op.kind === "controller" || op.kind === "contrato") score += 1;
+  return score;
+}
+
+function fileLabel(filePath) {
+  return String(filePath || "").split("/").pop() || filePath;
+}
+
+function pickOperations(operations, methods, words, evidenceFiles) {
+  const scored = (operations || [])
+    .map((op) => ({ op, score: scoreOperation(op, methods, words) }))
+    .filter((row) => row.score >= 4)
+    .sort((a, b) => b.score - a.score || a.op.path.localeCompare(b.op.path));
+  const preferred = scored.filter((row) => evidenceFiles.includes(row.op.file) || row.op.kind === "contrato");
+  const pool = preferred.length ? preferred : scored;
+  const seen = new Set();
+  const picked = [];
+  for (const row of pool) {
+    const key = `${row.op.method} ${row.op.path}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(row.op);
+    if (picked.length >= 4) break;
+  }
+  return picked;
+}
+
+function cumpleEvidence(corpus, methods, files, operations) {
+  const repo = `${corpus.repo}@${corpus.ref}`;
+  if (operations.length) {
+    const endpoints = unique(
+      operations.map((op) => (op.path ? `${op.method} ${op.path}` : op.method))
+    );
+    const labels = unique(operations.map((op) => fileLabel(op.file)));
+    return `Endpoints/métodos: ${endpoints.join("; ")}. Archivos: ${labels.join(", ")} (${repo}).`;
+  }
+  if (methods.length && files.length) {
+    return `Método ${methods.join("/")} cubierto en ${files.map(fileLabel).join(", ")} (${repo}).`;
+  }
+  if (files.length) {
+    return `Implementado en ${files.map(fileLabel).join(", ")} (${repo}).`;
+  }
+  return `Implementado en la rama ${repo}.`;
+}
+
 function extractWords(text) {
   return unique(
     fold(text)
@@ -197,7 +326,7 @@ function validateEeccCase(c, corpus, cap) {
   return { ...c, title, result, evidence };
 }
 
-function validateOne(c, corpus, analysis) {
+function validateOne(c, corpus, analysis, operations) {
   const eecc = detectEecc(corpus);
   if (eecc) return validateEeccCase(c, corpus, eecc);
 
@@ -265,12 +394,16 @@ function validateOne(c, corpus, analysis) {
   }
 
   const scenario = String(c.title || c.id || "el escenario").trim();
+  const matchedOps = pickOperations(operations, methods, words, evidenceFiles);
+  const opPaths = unique(matchedOps.map((op) => op.path).filter(Boolean));
   let evidence = "";
-  if (result === "Parcial") {
+  if (result === "Cumple") {
+    evidence = cumpleEvidence(corpus, methods, evidenceFiles, matchedOps);
+  } else if (result === "Parcial") {
     evidence = evidenceFiles.length
       ? `No cubre el escenario completo: «${scenario}». Solo hay coincidencias parciales en ${evidenceFiles.join(", ")} (${corpus.repo}@${corpus.ref}).`
       : `No cubre el escenario completo: «${scenario}». Hay indicios en ${corpus.repo}@${corpus.ref}, pero falta el flujo descrito.`;
-  } else if (result === "No cumple") {
+  } else {
     evidence = `No cumple porque en la rama ${corpus.repo}@${corpus.ref} no hay código que implemente «${scenario}»: no se encontró endpoint, servicio ni test asociado.`;
   }
 
@@ -279,15 +412,17 @@ function validateOne(c, corpus, analysis) {
     result,
     evidence,
     validation: {
-      paths,
+      paths: unique([...paths, ...opPaths]),
       methods,
       files: evidenceFiles,
+      operations: matchedOps.map((op) => ({ method: op.method, path: op.path, file: op.file })),
     },
   };
 }
 
 function validateCases(cases, corpus, analysis) {
-  const validated = (cases || []).map((c) => validateOne(c, corpus, analysis || {}));
+  const operations = listOperations(corpus);
+  const validated = (cases || []).map((c) => validateOne(c, corpus, analysis || {}, operations));
   const count = (r) => validated.filter((c) => c.result === r).length;
   return {
     cases: validated,

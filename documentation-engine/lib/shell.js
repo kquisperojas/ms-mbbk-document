@@ -5,12 +5,11 @@ const { config } = require("./env");
 const CACHE = path.join(config.ROOT, "templates", "informe-shell.html");
 
 function readCanonical() {
+  if (fs.existsSync(CACHE)) return fs.readFileSync(CACHE, "utf8");
   try {
-    const html = fs.readFileSync(config.CANONICAL_REPORT, "utf8");
-    fs.writeFileSync(CACHE, html, "utf8");
-    return html;
+    return fs.readFileSync(config.CANONICAL_REPORT, "utf8");
   } catch (_) {
-    return fs.readFileSync(CACHE, "utf8");
+    return "";
   }
 }
 

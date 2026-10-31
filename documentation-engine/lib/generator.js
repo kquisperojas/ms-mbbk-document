@@ -3,12 +3,14 @@ const path = require("path");
 const zlib = require("zlib");
 const { execFile } = require("child_process");
 const { config } = require("./env");
-const { getInitiative } = require("./jira");
+const { getInitiative, isJiraPopulated } = require("./jira");
 const { docxParagraphs } = require("./docx");
 const { analyzeDet, emptyAnalysis } = require("./analyze");
 const { imageViewerHtml } = require("./diagram-viewer");
+const { buildArchifyCandidate } = require("./archify-from-image");
 const { buildReport, primaryMs } = require("./report");
 const { writeModel, saveDocument } = require("./docs-admin");
+const { syncReviewRecord, clearDraft } = require("./doc-status");
 
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"]);
 const GROUP_LABELS = {
@@ -282,13 +284,37 @@ async function saveFiles(files, dir) {
   return saved;
 }
 
-async function buildDiagram(saved, kind, folder, warnings) {
+async function publishArchify(candidate, kind, folder, htmlName, base, sourceName, warnings) {
+  const type = candidate.diagram_type || (kind === "Secuencia" ? "sequence" : "architecture");
+  const workDir = path.join(folder.root, ".archify", `${type}-${base}-${stamp()}`);
+  fs.mkdirSync(workDir, { recursive: true });
+  const input = path.join(workDir, "candidate.json");
+  const output = path.join(folder.diagrams, htmlName);
+  const prepared = withoutSourceEvidence(candidate, `diagrams/${htmlName}`);
+  fs.writeFileSync(input, JSON.stringify(prepared, null, 2));
+  await runArchify(type, input, output, prepared.meta?.quality_profile || "standard", folder.root);
+  return {
+    id: `${kind === "Secuencia" ? "secuencia" : "arquitectura"}-${base}`,
+    kind,
+    label: prepared.meta?.title || sourceName,
+    src: `diagrams/${htmlName}`,
+    description: `Diagrama Archify interactivo generado desde ${sourceName}.`,
+    steps: type === "sequence" ? stepsFromSequence(prepared) : [],
+    archify: true,
+  };
+}
+
+async function buildDiagram(saved, kind, folder, warnings, options = {}) {
   const base = slug(path.basename(saved.name, saved.ext));
   const prefix = kind === "Secuencia" ? "secuencia" : "arquitectura";
   const label = path.basename(saved.name, saved.ext).replace(/[_-]+/g, " ").trim();
   const htmlName = `${prefix}-${base}.html`;
 
   if (saved.ext === ".json") {
+    if (!options.useArchify) {
+      warnings.push(`${saved.name}: candidate.json no se renderizó porque no se pidió Archify. Quedó en artefactos.`);
+      return null;
+    }
     let candidate;
     try {
       candidate = JSON.parse(saved.buffer.toString("utf8"));
@@ -296,29 +322,36 @@ async function buildDiagram(saved, kind, folder, warnings) {
       warnings.push(`${saved.name}: JSON inválido (${e.message}).`);
       return null;
     }
-    const type = candidate.diagram_type || (kind === "Secuencia" ? "sequence" : "architecture");
-    const workDir = path.join(folder.root, ".archify", `${type}-${base}-${stamp()}`);
-    fs.mkdirSync(workDir, { recursive: true });
-    const input = path.join(workDir, "candidate.json");
-    const output = path.join(folder.diagrams, htmlName);
-    fs.writeFileSync(input, JSON.stringify(withoutSourceEvidence(candidate, `diagrams/${htmlName}`), null, 2));
     try {
-      await runArchify(type, input, output, candidate.meta?.quality_profile || "standard", folder.root);
+      return await publishArchify(candidate, kind, folder, htmlName, base, saved.name, warnings);
     } catch (e) {
       warnings.push(`${saved.name}: Archify no pudo renderizar (${e.message.split("\n")[0]}).`);
       return null;
     }
-    return {
-      id: `${prefix}-${base}`,
-      kind,
-      label: candidate.meta?.title || label,
-      src: `diagrams/${htmlName}`,
-      description: `Diagrama Archify interactivo generado desde ${saved.name}.`,
-      steps: type === "sequence" ? stepsFromSequence(candidate) : [],
-    };
   }
 
   if (IMAGE_EXT.has(saved.ext)) {
+    if (options.useArchify) {
+      const built = buildArchifyCandidate(saved, kind, options.analysis, `diagrams/${htmlName}`);
+      if (built && built.candidate) {
+        try {
+          const published = await publishArchify(built.candidate, kind, folder, htmlName, base, saved.name, warnings);
+          published.description =
+            built.source === "drawio"
+              ? `Diagrama Archify reconstruido desde el modelo embebido en ${saved.name}.`
+              : `Diagrama Archify generado a partir de ${saved.name} y el DET de la iniciativa.`;
+          return published;
+        } catch (e) {
+          warnings.push(`${saved.name}: Archify no pudo renderizar el diagrama generado (${e.message.split("\n")[0]}).`);
+        }
+      } else {
+        warnings.push(`${saved.name}: no se pudo reconstruir un candidato Archify desde la imagen.`);
+      }
+    }
+    if (options.useArchify) {
+      warnings.push(`${saved.name}: se pidió Archify pero no se publicó visor de imagen.`);
+      return null;
+    }
     fs.writeFileSync(
       path.join(folder.diagrams, htmlName),
       imageViewerHtml({
@@ -333,7 +366,7 @@ async function buildDiagram(saved, kind, folder, warnings) {
       kind,
       label,
       src: `diagrams/${htmlName}`,
-      description: `${kind} entregado como imagen (${saved.name}), en visor Archify con zoom, tema y exportación.`,
+      description: `${kind} entregado como imagen (${saved.name}).`,
       steps: [],
     };
   }
@@ -363,7 +396,25 @@ function writeReadme(folder, key, model) {
  * Crea o actualiza DOCUMENTACION/<KEY>/informe-<KEY>.html con los insumos del formulario.
  * Si ya existe un informe, se respalda antes de sobrescribirlo.
  */
-async function generateDocumentation({ key, figmaUrl, det, sequences, architectures, tests, others }) {
+async function contrastCasesWithBranch(cases, featureBranchUrl, analysis) {
+  const { loadBranchCorpus } = require("./github-code");
+  const { validateCases } = require("./validate-cases");
+  const corpus = await loadBranchCorpus(featureBranchUrl);
+  const validated = validateCases(cases, corpus, analysis);
+  return {
+    cases: validated.cases,
+    summary: validated.summary,
+    featureBranchUrl: corpus.url,
+    featureBranch: `${corpus.owner}/${corpus.repo}@${corpus.ref}`,
+  };
+}
+
+async function generateDocumentation({ key, figmaUrl, featureBranch, det, sequences, architectures, tests, others }) {
+  if (!det || !det.length) {
+    const err = new Error("Adjunta el documento técnico (DET).");
+    err.status = 400;
+    throw err;
+  }
   const root = path.join(config.DOCS_ROOT, key);
   const folder = { root, diagrams: path.join(root, "diagrams"), artefactos: path.join(root, "artefactos") };
   fs.mkdirSync(folder.diagrams, { recursive: true });
@@ -414,11 +465,11 @@ async function generateDocumentation({ key, figmaUrl, det, sequences, architectu
 
   const diagrams = [];
   for (const s of archSaved) {
-    const d = await buildDiagram(s, "Arquitectura", folder, warnings);
+    const d = await buildDiagram(s, "Arquitectura", folder, warnings, { useArchify: true, analysis });
     if (d) diagrams.push(d);
   }
   for (const s of seqSaved) {
-    const d = await buildDiagram(s, "Secuencia", folder, warnings);
+    const d = await buildDiagram(s, "Secuencia", folder, warnings, { useArchify: true, analysis });
     if (d) diagrams.push(d);
   }
   const pendingDiagrams = [];
@@ -431,12 +482,32 @@ async function generateDocumentation({ key, figmaUrl, det, sequences, architectu
   if (parsedTests.cases.length) cases = parsedTests.cases;
   else if (testSaved.length) warnings.push("Casos de prueba: usa Excel (.xlsx) o CSV para poblar la sección Pruebas; el archivo quedó en artefactos.");
 
+  const branch = String(featureBranch || "").trim();
+  const branchMeta = {};
+  if (cases && branch) {
+    try {
+      const contrasted = await contrastCasesWithBranch(cases, branch, analysis);
+      cases = contrasted.cases;
+      branchMeta.featureBranchUrl = contrasted.featureBranchUrl;
+      branchMeta.featureBranch = contrasted.featureBranch;
+      branchMeta.testsValidation = contrasted.summary;
+      branchMeta.testsValidatedAt = new Date().toLocaleString("es-PE");
+    } catch (e) {
+      warnings.push(`Rama feature: no se pudo contrastar los casos de prueba (${e.message}).`);
+      branchMeta.featureBranchUrl = branch;
+    }
+  } else if (branch) {
+    branchMeta.featureBranchUrl = branch;
+  } else if (cases) {
+    warnings.push("Casos de prueba: se cargaron sin contrastar con código. Indica la Rama Feature para validarlos.");
+  }
+
   const title = jira?.summary || key;
   const model = {
     key,
-    title: title.length > 60 ? title.slice(0, 57) + "…" : title,
+    title,
     subtitle: primaryMs(analysis)?.name || jira?.issueType || "Iniciativa",
-    jira,
+    jira: isJiraPopulated(jira) ? jira : null,
     jiraUrl: jira?.url || `${config.JIRA_BASE_URL}/browse/${key}`,
     figmaUrl: figmaUrl || "",
     analysis,
@@ -447,12 +518,15 @@ async function generateDocumentation({ key, figmaUrl, det, sequences, architectu
     pendingDiagrams,
     cases,
     generatedAt: new Date().toLocaleString("es-PE"),
+    ...branchMeta,
   };
 
   writeModel(key, model);
   fs.writeFileSync(reportPath, buildReport(model), "utf8");
   if (figmaUrl) fs.writeFileSync(path.join(folder.artefactos, "figma.url.txt"), figmaUrl + "\n", "utf8");
   writeReadme(folder, key, model);
+  const review = syncReviewRecord(key);
+  clearDraft(key);
 
   const fileUrl = "file:///" + reportPath.replace(/\\/g, "/") + "#iniciativa";
   return {
@@ -462,6 +536,9 @@ async function generateDocumentation({ key, figmaUrl, det, sequences, architectu
     httpUrl: `/docs/${key}/informe-${key}.html#iniciativa`,
     backup,
     warnings,
+    status: review.status,
+    statusLabel: review.statusLabel,
+    missing: review.missing,
     summary: {
       jira: Boolean(jira),
       endpoints: analysis.endpoints.length,
@@ -473,8 +550,6 @@ async function generateDocumentation({ key, figmaUrl, det, sequences, architectu
 }
 
 async function updateTestsDocumentation(key, tests, featureBranchUrl) {
-  const { loadBranchCorpus } = require("./github-code");
-  const { validateCases } = require("./validate-cases");
   const root = path.join(config.DOCS_ROOT, key);
   const reportFile = path.join(root, `informe-${key}.html`);
   if (!fs.existsSync(reportFile)) {
@@ -507,34 +582,223 @@ async function updateTestsDocumentation(key, tests, featureBranchUrl) {
   }
   const modelFile = path.join(root, "model.json");
   const model = fs.existsSync(modelFile) ? JSON.parse(fs.readFileSync(modelFile, "utf8")) : { key, analysis: {} };
-  const corpus = await loadBranchCorpus(branch);
-  const validated = validateCases(parsed.cases, corpus, model.analysis);
+  const contrasted = await contrastCasesWithBranch(parsed.cases, branch, model.analysis);
   const attachments = Array.isArray(model.attachments) ? model.attachments.slice() : [];
   testSaved.forEach((s) =>
     attachments.push({ name: s.name, href: artefactHref(s.name), group: "tests", groupLabel: GROUP_LABELS.tests })
   );
+  const now = new Date().toLocaleString("es-PE");
   const saved = saveDocument(key, {
     mode: "model",
     model: {
       ...model,
       attachments,
-      cases: validated.cases,
-      featureBranchUrl: corpus.url,
-      featureBranch: `${corpus.owner}/${corpus.repo}@${corpus.ref}`,
-      testsUpdatedAt: new Date().toLocaleString("es-PE"),
-      testsValidatedAt: new Date().toLocaleString("es-PE"),
-      testsValidation: validated.summary,
+      cases: contrasted.cases,
+      featureBranchUrl: contrasted.featureBranchUrl,
+      featureBranch: contrasted.featureBranch,
+      testsUpdatedAt: now,
+      testsValidatedAt: now,
+      testsValidation: contrasted.summary,
     },
   });
+  const review = syncReviewRecord(key);
   return {
     key,
-    cases: validated.cases.length,
-    summary: validated.summary,
+    cases: contrasted.cases.length,
+    summary: contrasted.summary,
     warnings: parsed.warnings,
     backup: saved.backup,
     url: `/docs/${key}/informe-${key}.html#pruebas`,
     httpUrl: `/docs/${key}/informe-${key}.html#pruebas`,
+    status: review.status,
+    statusLabel: review.statusLabel,
+    missing: review.missing,
   };
 }
 
-module.exports = { generateDocumentation, updateTestsDocumentation, parseCasesFromRows, parseCasesFromSaved, xlsxToRows };
+function extractJiraKey(link) {
+  const text = String(link || "");
+  const selected = text.match(/[?&]selectedIssue=([A-Z][A-Z0-9_]+-\d+)/i);
+  if (selected) return selected[1].toUpperCase();
+  const browse = text.match(/\/browse\/([A-Z][A-Z0-9_]+-\d+)/i);
+  if (browse) return browse[1].toUpperCase();
+  const any = text.match(/\b([A-Z][A-Z0-9_]+-\d+)\b/i);
+  return any ? any[1].toUpperCase() : null;
+}
+
+function requireExisting(key) {
+  const root = path.join(config.DOCS_ROOT, key);
+  const reportFile = path.join(root, `informe-${key}.html`);
+  if (!fs.existsSync(reportFile)) {
+    const err = new Error(`No hay informe para ${key}. Genera la documentación primero.`);
+    err.status = 404;
+    throw err;
+  }
+  const modelFile = path.join(root, "model.json");
+  const model = fs.existsSync(modelFile) ? JSON.parse(fs.readFileSync(modelFile, "utf8")) : { key, analysis: emptyAnalysis() };
+  return {
+    root,
+    diagrams: path.join(root, "diagrams"),
+    artefactos: path.join(root, "artefactos"),
+    modelFile,
+    model,
+  };
+}
+
+function mergeAttachments(existing, group, saved) {
+  const rest = (existing || []).filter((item) => item.group !== group);
+  const next = saved.map((file) => ({
+    name: file.name,
+    href: artefactHref(file.name),
+    group,
+    groupLabel: GROUP_LABELS[group],
+  }));
+  return [...rest, ...next];
+}
+
+async function updateIniciativaDocumentation(key, det, jiraLink) {
+  const ctx = requireExisting(key);
+  if (!det || !det.length) {
+    const err = new Error("Adjunta el documento técnico (DET).");
+    err.status = 400;
+    throw err;
+  }
+  const link = String(jiraLink || "").trim() || ctx.model.jiraUrl || "";
+  const extracted = extractJiraKey(link);
+  if (extracted && extracted !== String(key).toUpperCase()) {
+    const err = new Error(`El link de la épica debe ser de ${key}.`);
+    err.status = 400;
+    throw err;
+  }
+  fs.mkdirSync(ctx.artefactos, { recursive: true });
+  const detSaved = await saveFiles(det, ctx.artefactos);
+  const warnings = [];
+  let analysis = ctx.model.analysis || emptyAnalysis();
+  let detSections = ctx.model.detSections || [];
+  let detName = ctx.model.detName || "";
+  const detDoc = detSaved.find((file) => file.ext === ".docx");
+  if (detDoc) {
+    try {
+      analysis = analyzeDet(docxParagraphs(detDoc.buffer));
+      detSections = analysis.sections;
+      detName = detSaved[0].name;
+    } catch (e) {
+      warnings.push(`DET: no se pudo leer el DOCX (${e.message}).`);
+    }
+  } else if (detSaved.length) {
+    detName = detSaved[0].name;
+    warnings.push("DET: solo se analiza contenido de archivos .docx; el archivo quedó enlazado en artefactos.");
+  }
+  let jira = isJiraPopulated(ctx.model.jira) ? ctx.model.jira : null;
+  if (link) {
+    try {
+      jira = await getInitiative(key);
+    } catch (e) {
+      warnings.push(`Jira: ${e.message}`);
+    }
+  }
+  const saved = saveDocument(key, {
+    mode: "model",
+    model: {
+      ...ctx.model,
+      analysis,
+      detSections,
+      detName,
+      jira: isJiraPopulated(jira) ? jira : null,
+      jiraUrl: (jira && jira.url) || link || ctx.model.jiraUrl,
+      title: (jira && jira.summary) || ctx.model.title,
+      subtitle: primaryMs(analysis)?.name || ctx.model.subtitle,
+      attachments: mergeAttachments(ctx.model.attachments, "det", detSaved),
+    },
+  });
+  const review = syncReviewRecord(key);
+  return {
+    key,
+    warnings,
+    backup: saved.backup,
+    url: `/docs/${key}/informe-${key}.html#iniciativa`,
+    httpUrl: `/docs/${key}/informe-${key}.html#iniciativa`,
+    status: review.status,
+    statusLabel: review.statusLabel,
+    missing: review.missing,
+  };
+}
+
+async function updateDiagramsDocumentation(key, sequences, architectures, useArchify) {
+  const ctx = requireExisting(key);
+  const seq = sequences || [];
+  const arch = architectures || [];
+  if (!seq.length && !arch.length) {
+    const err = new Error("Adjunta diagramas de secuencia y/o arquitectura.");
+    err.status = 400;
+    throw err;
+  }
+  fs.mkdirSync(ctx.diagrams, { recursive: true });
+  fs.mkdirSync(ctx.artefactos, { recursive: true });
+  const warnings = [];
+  const seqSaved = await saveFiles(seq, ctx.artefactos);
+  const archSaved = await saveFiles(arch, ctx.artefactos);
+  const existing = Array.isArray(ctx.model.diagrams) ? ctx.model.diagrams : [];
+  const diagrams = [];
+  const opts = { useArchify: Boolean(useArchify), analysis: ctx.model.analysis || emptyAnalysis() };
+  if (archSaved.length) {
+    for (const file of archSaved) {
+      const diagram = await buildDiagram(file, "Arquitectura", ctx, warnings, opts);
+      if (diagram) diagrams.push(diagram);
+    }
+  } else {
+    diagrams.push(...existing.filter((item) => item.kind === "Arquitectura"));
+  }
+  if (seqSaved.length) {
+    for (const file of seqSaved) {
+      const diagram = await buildDiagram(file, "Secuencia", ctx, warnings, opts);
+      if (diagram) diagrams.push(diagram);
+    }
+  } else {
+    diagrams.push(...existing.filter((item) => item.kind === "Secuencia"));
+  }
+  const pendingDiagrams = [];
+  if (!diagrams.some((item) => item.kind === "Arquitectura")) {
+    pendingDiagrams.push("Arquitectura de microservicios (Logical/Physical To-Be)");
+  }
+  if (!diagrams.some((item) => item.kind === "Secuencia")) {
+    pendingDiagrams.push("Diagramas de secuencia por flujo");
+  }
+  let attachments = ctx.model.attachments || [];
+  if (archSaved.length) attachments = mergeAttachments(attachments, "architecture", archSaved);
+  if (seqSaved.length) attachments = mergeAttachments(attachments, "sequence", seqSaved);
+  const saved = saveDocument(key, {
+    mode: "model",
+    model: {
+      ...ctx.model,
+      attachments,
+      diagrams,
+      pendingDiagrams,
+      useArchify: Boolean(useArchify),
+    },
+  });
+  const review = syncReviewRecord(key);
+  return {
+    key,
+    diagrams: diagrams.length,
+    useArchify: Boolean(useArchify),
+    warnings,
+    backup: saved.backup,
+    url: `/docs/${key}/informe-${key}.html#diagramas`,
+    httpUrl: `/docs/${key}/informe-${key}.html#diagramas`,
+    status: review.status,
+    statusLabel: review.statusLabel,
+    missing: review.missing,
+  };
+}
+
+module.exports = {
+  generateDocumentation,
+  updateTestsDocumentation,
+  updateIniciativaDocumentation,
+  updateDiagramsDocumentation,
+  buildDiagram,
+  parseCasesFromRows,
+  parseCasesFromSaved,
+  xlsxToRows,
+};

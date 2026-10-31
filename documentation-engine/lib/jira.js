@@ -191,4 +191,8 @@ function extractIssueKey(link) {
   return any ? any[1].toUpperCase() : null;
 }
 
-module.exports = { listInitiatives, getInitiative, whoAmI, extractIssueKey, buildJql };
+function isJiraPopulated(jira) {
+  return Boolean(jira && typeof jira === "object" && String(jira.summary || "").trim());
+}
+
+module.exports = { listInitiatives, getInitiative, whoAmI, extractIssueKey, buildJql, isJiraPopulated };

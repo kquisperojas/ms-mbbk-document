@@ -989,32 +989,63 @@
       setTimeout(() => toast.classList.remove("show"), 4200);
     }
 
+    function frontendOrigin() {
+      try {
+        if (window.parent && window.parent !== window && window.parent.location) {
+          return window.parent.location.origin;
+        }
+      } catch (_) {}
+      if (location.protocol === "http:" || location.protocol === "https:") {
+        return location.origin;
+      }
+      return "";
+    }
+
+    function docKey() {
+      const fromPath = String(location.pathname || "").match(/informe-([^/?#]+)\.html/i);
+      if (fromPath) return fromPath[1];
+      const fromFile = String(FILE_URL_BASE || "").match(/informe-([^/?#]+)\.html/i);
+      if (fromFile) return fromFile[1];
+      return "NEG-1678";
+    }
+
+    function sectionShareUrl(section) {
+      try {
+        if (window.parent && window.parent !== window && window.parent.location) {
+          const loc = window.parent.location;
+          const path = String(loc.pathname || "").replace(/\/+$/, "");
+          if (path.indexOf("/portal/informe/") === 0) {
+            return loc.origin + path + "#" + section;
+          }
+          return loc.origin + "/portal/informe/" + docKey() + "#" + section;
+        }
+      } catch (_) {}
+      const origin = frontendOrigin();
+      const key = docKey();
+      if (origin) return origin + "/portal/informe/" + key + "#" + section;
+      return FILE_URL_BASE + "#" + section;
+    }
+
     function sectionHref(section) {
-      const base = location.href.split("#")[0];
-      return base + "#" + section;
+      return sectionShareUrl(section);
     }
 
     function sectionFsPath(section) {
       return FILE_PATH + "#" + section;
     }
 
-    /* Navegadores necesitan file:///… no C:\… */
     function sectionFileUrl(section) {
-      return FILE_URL_BASE + "#" + section;
+      return sectionShareUrl(section);
     }
 
     function shareMessage(section) {
       const label = SECTION_LABELS[section] || section;
-      const fileUrl = sectionFileUrl(section);
-      const path = sectionFsPath(section);
+      const url = sectionShareUrl(section);
       return [
         "NEG-1678 · Estado de Cuenta — " + label,
         "",
-        "Abrir en el navegador (pega esta URL):",
-        fileUrl,
-        "",
-        "Ruta en disco:",
-        path,
+        "Abrir en el navegador:",
+        url,
       ].join(String.fromCharCode(10));
     }
 
@@ -1101,7 +1132,7 @@
         window.open(teamsUrl, "_blank", "noopener,noreferrer");
         showToast(
           (ok ? "URL copiada al portapapeles. " : "") +
-            "En Teams pega la URL file:/// si el enlace no se abre solo."
+            "Se abrió Teams para compartir el enlace."
         );
         closeShareMenu();
         return;
@@ -1126,6 +1157,7 @@
     });
 
     shareMenu.addEventListener("click", (e) => {
+      if (e.target.closest("#share-word, .share-word")) return;
       const sectionBtn = e.target.closest(".share-section");
       if (sectionBtn) {
         e.stopPropagation();

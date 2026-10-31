@@ -5,6 +5,8 @@ import com.pichincha.mbbk.document.credential.exception.CredentialNotFoundExcept
 import com.pichincha.mbbk.document.docs.DocumentationException;
 import com.pichincha.mbbk.document.jira.JiraClientException;
 import com.pichincha.mbbk.document.jira.JiraNotConfiguredException;
+import com.pichincha.mbbk.document.squad.exception.DuplicateTeamMemberException;
+import com.pichincha.mbbk.document.squad.exception.TeamMemberNotFoundException;
 import com.pichincha.mbbk.document.user.exception.DuplicateUserException;
 import com.pichincha.mbbk.document.user.exception.InvalidCredentialsException;
 import com.pichincha.mbbk.document.user.exception.UserNotFoundException;
@@ -29,6 +31,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CredentialNotFoundException.class)
     public ProblemDetail handleCredentialNotFound(CredentialNotFoundException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(TeamMemberNotFoundException.class)
+    public ProblemDetail handleTeamMemberNotFound(TeamMemberNotFoundException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateTeamMemberException.class)
+    public ProblemDetail handleDuplicateTeamMember(DuplicateTeamMemberException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidCredentialsException.class)
@@ -83,7 +95,7 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors()
                 .forEach(error -> errors.putIfAbsent(error.getField(), error.getDefaultMessage()));
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
-                "Datos de usuario inválidos");
+                "Datos inválidos");
         problem.setProperty("errors", errors);
         return problem;
     }
